@@ -38,6 +38,7 @@ required.
 /admin/activities[/:id]      → Manage Activities
 /admin/blog[/:id]            → Manage Blog Posts
 /admin/messages              → Contact form submissions
+/admin/media                 → Media Library (folders + photo uploads)
 /admin/settings              → Travel consultant card
 ```
 
@@ -158,6 +159,13 @@ If you're using the "Node.js Web Application" option:
   schema.org structured data (`TouristTrip` / `BlogPosting`) for richer search results.
 - **FAQ page** (`/faq/`) is included and listed under the "Company" menu alongside About
   Us, Terms and Conditions, and Privacy Policy.
+- **Media Library** (`/admin/media`): upload photos here first — organize them into
+  folders if you like — and every photo is automatically converted to WebP for faster page
+  loads (falls back to the original file if a particular image can't be converted). Package
+  Tour / Daily Tour / Activity galleries, Blog cover images, and the consultant photo in
+  Settings all pick their images from this library instead of uploading a file per form, so
+  the same photo can be reused across multiple listings. Files are stored under
+  `server/uploads/media/`.
 
 ## Demo Content
 
