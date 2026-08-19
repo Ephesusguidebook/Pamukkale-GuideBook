@@ -6,6 +6,7 @@
 export const CATEGORIES = {
   packageTours: {
     key: 'package-tours',
+    pageKey: 'packageTours',
     label: 'Package Tour',
     pluralLabel: 'Package Tours',
     publicPath: '/package-tours',
@@ -21,6 +22,7 @@ export const CATEGORIES = {
   },
   dailyTours: {
     key: 'daily-tours',
+    pageKey: 'dailyTours',
     label: 'Daily Tour',
     pluralLabel: 'Daily Tours',
     publicPath: '/daily-tours',
@@ -35,6 +37,7 @@ export const CATEGORIES = {
   },
   activities: {
     key: 'activities',
+    pageKey: 'activities',
     label: 'Activity',
     pluralLabel: 'Activities',
     publicPath: '/activities',

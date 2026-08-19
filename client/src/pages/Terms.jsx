@@ -1,9 +1,18 @@
+import { usePageContent } from '../PageContentContext';
+
 export default function Terms() {
+  const { h1, p } = usePageContent('terms', {
+    h1: 'Terms and Conditions',
+    p: 'Please read these terms carefully before booking a tour or activity with us.',
+  });
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-14 sm:px-6">
-      <h1 className="text-2xl font-bold text-gray-900">Terms and Conditions</h1>
+      <h1 className="text-2xl font-bold text-gray-900">{h1}</h1>
+      <p className="mt-2 text-gray-500">{p}</p>
       <p className="mt-2 text-sm text-gray-400">
-        This is placeholder text — replace it with your own reviewed terms before launch.
+        The sections below are placeholder text — replace them with your own reviewed terms
+        before launch.
       </p>
 
       <div className="prose mt-6 max-w-none space-y-5 text-gray-700">

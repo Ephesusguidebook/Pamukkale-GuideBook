@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom';
 import { AdminAuthProvider } from './AdminAuthContext';
+import { PageContentProvider } from './PageContentContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import AdminLayout from './components/AdminLayout';
@@ -25,6 +26,7 @@ import AdminBlogList from './pages/admin/AdminBlogList';
 import AdminBlogForm from './pages/admin/AdminBlogForm';
 import Messages from './pages/admin/Messages';
 import Settings from './pages/admin/Settings';
+import PageContent from './pages/admin/PageContent';
 
 function PublicLayout({ children }) {
   return (
@@ -39,6 +41,7 @@ function PublicLayout({ children }) {
 export default function App() {
   return (
     <AdminAuthProvider>
+      <PageContentProvider>
       <Routes>
         <Route path="/" element={<PublicLayout><Home /></PublicLayout>} />
 
@@ -120,10 +123,12 @@ export default function App() {
 
           <Route path="messages" element={<Messages />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="page-content" element={<PageContent />} />
         </Route>
 
         <Route path="*" element={<PublicLayout><NotFound /></PublicLayout>} />
       </Routes>
+      </PageContentProvider>
     </AdminAuthProvider>
   );
 }

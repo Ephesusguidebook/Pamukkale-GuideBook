@@ -1,10 +1,18 @@
+import { usePageContent } from '../PageContentContext';
+
 export default function PrivacyPolicy() {
+  const { h1, p } = usePageContent('privacy', {
+    h1: 'Privacy Policy',
+    p: 'How we collect, use and protect the information you share with us.',
+  });
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-14 sm:px-6">
-      <h1 className="text-2xl font-bold text-gray-900">Privacy Policy</h1>
+      <h1 className="text-2xl font-bold text-gray-900">{h1}</h1>
+      <p className="mt-2 text-gray-500">{p}</p>
       <p className="mt-2 text-sm text-gray-400">
-        This is placeholder text — replace it with your own reviewed privacy policy before
-        launch.
+        The sections below are placeholder text — replace them with your own reviewed privacy
+        policy before launch.
       </p>
 
       <div className="prose mt-6 max-w-none space-y-5 text-gray-700">

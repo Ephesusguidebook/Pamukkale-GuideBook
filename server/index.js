@@ -16,6 +16,8 @@ const adminUploadRouter = require('./routes/adminUpload');
 const authRouter = require('./routes/auth');
 const contactRouter = require('./routes/contact');
 const settingsRouter = require('./routes/settings');
+const pageContentRouter = require('./routes/pageContent');
+const adminPageContentRouter = require('./routes/adminPageContent');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -39,6 +41,8 @@ app.use('/api/admin/upload', adminUploadRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/contact', contactRouter);
 app.use('/api/settings', settingsRouter);
+app.use('/api/page-content', pageContentRouter);
+app.use('/api/admin/page-content', adminPageContentRouter);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

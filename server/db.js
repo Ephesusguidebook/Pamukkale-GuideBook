@@ -24,6 +24,7 @@ function emptyState() {
       consultant_email: '',
       consultant_photo: '',
     },
+    pageContent: {},
     counters: {
       adminUsers: 0,
       packageTours: 0,
@@ -387,6 +388,72 @@ const settings = {
   },
 };
 
+// --- Editable page content (H1 + intro paragraph per page) ---
+// Lets the admin tweak headline copy without a code change. Falls back to
+// these defaults wherever the admin hasn't overridden a page yet.
+const PAGE_CONTENT_DEFAULTS = {
+  home: {
+    h1: 'Find your dream tour and hit the road',
+    p: 'Explore our carefully curated package tours, daily tours and activities. Detailed itineraries, transparent pricing and easy communication.',
+  },
+  packageTours: {
+    h1: 'Package Tours',
+    p: 'Multi-day, all-inclusive tour packages covering the best destinations in Turkey.',
+  },
+  dailyTours: {
+    h1: 'Daily Tours',
+    p: 'Single-day guided tours — see the highlights without an overnight stay.',
+  },
+  activities: {
+    h1: 'Activities',
+    p: 'Standalone experiences and activities you can add to your trip.',
+  },
+  blog: {
+    h1: 'Blog',
+    p: 'Travel tips, destination guides and stories from around Turkey.',
+  },
+  aboutUs: {
+    h1: 'About Us',
+    p: 'We are a Turkey-based travel company dedicated to helping you discover the country’s most remarkable destinations.',
+  },
+  contact: {
+    h1: 'Contact',
+    p: "Questions or special requests? Send us a message and we'll get back to you as soon as possible.",
+  },
+  terms: {
+    h1: 'Terms and Conditions',
+    p: 'Please read these terms carefully before booking a tour or activity with us.',
+  },
+  privacy: {
+    h1: 'Privacy Policy',
+    p: 'How we collect, use and protect the information you share with us.',
+  },
+};
+
+const pageContent = {
+  get() {
+    const stored = state.pageContent || {};
+    const merged = {};
+    for (const key of Object.keys(PAGE_CONTENT_DEFAULTS)) {
+      merged[key] = { ...PAGE_CONTENT_DEFAULTS[key], ...(stored[key] || {}) };
+    }
+    return merged;
+  },
+  update(input) {
+    const next = {};
+    for (const key of Object.keys(PAGE_CONTENT_DEFAULTS)) {
+      const b = (input && input[key]) || {};
+      next[key] = {
+        h1: b.h1 !== undefined ? String(b.h1) : pageContent.get()[key].h1,
+        p: b.p !== undefined ? String(b.p) : pageContent.get()[key].p,
+      };
+    }
+    state.pageContent = next;
+    persist();
+    return pageContent.get();
+  },
+};
+
 module.exports = {
   adminUsers,
   packageTours,
@@ -395,4 +462,5 @@ module.exports = {
   blogPosts,
   contactMessages,
   settings,
+  pageContent,
 };

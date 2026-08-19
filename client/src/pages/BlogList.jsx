@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api';
+import { usePageContent } from '../PageContentContext';
 
 function formatDate(iso) {
   try {
@@ -15,6 +16,10 @@ function formatDate(iso) {
 }
 
 export default function BlogList() {
+  const { h1, p } = usePageContent('blog', {
+    h1: 'Blog',
+    p: 'Travel tips, destination guides and stories from around Turkey.',
+  });
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -39,10 +44,8 @@ export default function BlogList() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-      <h1 className="text-2xl font-bold text-gray-900">Blog</h1>
-      <p className="mt-1 max-w-2xl text-sm text-gray-500">
-        Travel tips, destination guides and stories from around Turkey.
-      </p>
+      <h1 className="text-2xl font-bold text-gray-900">{h1}</h1>
+      <p className="mt-1 max-w-2xl text-sm text-gray-500">{p}</p>
 
       {loading && <p className="mt-8 text-gray-500">Loading...</p>}
       {error && <p className="mt-8 text-red-600">{error}</p>}

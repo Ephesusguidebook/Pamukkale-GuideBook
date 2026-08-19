@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'react';
 import api from '../api';
 import TourCard from '../components/TourCard';
+import { usePageContent } from '../PageContentContext';
 
 // Generic listing page reused for Package Tours, Daily Tours and Activities.
 // `category` comes from src/lib/categories.js and drives the API endpoint,
 // the URL prefix used for links, and the on-page copy.
 export default function CategoryList({ category }) {
+  const { h1, p } = usePageContent(category.pageKey, {
+    h1: category.heading,
+    p: category.intro,
+  });
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -38,8 +43,8 @@ export default function CategoryList({ category }) {
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
       <div className="mb-4">
-        <h1 className="text-2xl font-bold text-gray-900">{category.heading}</h1>
-        <p className="mt-1 max-w-2xl text-sm text-gray-500">{category.intro}</p>
+        <h1 className="text-2xl font-bold text-gray-900">{h1}</h1>
+        <p className="mt-1 max-w-2xl text-sm text-gray-500">{p}</p>
       </div>
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-end">
         <input

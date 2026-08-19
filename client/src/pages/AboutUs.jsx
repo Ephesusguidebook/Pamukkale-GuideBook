@@ -1,15 +1,21 @@
+import { usePageContent } from '../PageContentContext';
+
 export default function AboutUs() {
+  const { h1, p } = usePageContent('aboutUs', {
+    h1: 'About Us',
+    p: 'We are a Turkey-based travel company dedicated to helping you discover the country’s most remarkable destinations.',
+  });
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-14 sm:px-6">
-      <h1 className="text-2xl font-bold text-gray-900">About Us</h1>
+      <h1 className="text-2xl font-bold text-gray-900">{h1}</h1>
 
       <div className="prose mt-6 max-w-none space-y-4 text-gray-700">
+        <p>{p}</p>
         <p>
-          Welcome! We are a Turkey-based travel company dedicated to helping you discover the
-          country's most remarkable destinations — from the cotton-white travertines of
-          Pamukkale to the hot air balloons of Cappadocia and the ancient ruins of Ephesus.
-          Whatever brings you to Turkey, our goal is to make your trip effortless,
-          well-organized and genuinely memorable.
+          From the cotton-white travertines of Pamukkale to the hot air balloons of
+          Cappadocia and the ancient ruins of Ephesus, whatever brings you to Turkey, our
+          goal is to make your trip effortless, well-organized and genuinely memorable.
         </p>
         <p>
           Our team is made up of local travel consultants and guides who know these regions
