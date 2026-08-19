@@ -8,9 +8,14 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
 dist-ssr
 *.local
+
+# NOT: "dist" burada bilinçli olarak yok sayılmıyor (gitignore'da değil).
+# Hostinger'ın basit Node.js dagitimi ayrı bir "build komutu" adımı sunmuyor,
+# bu yuzden derlenmiş çıktıyı (dist/) doğrudan repoya dahil ediyoruz.
+# Ön yüzde değişiklik yaptığında "npm run build" ile yeniden derleyip
+# dist/ klasörünü tekrar commit'lemen gerekir.
 
 # Editor directories and files
 .vscode/*
