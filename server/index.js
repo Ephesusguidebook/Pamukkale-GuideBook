@@ -4,8 +4,15 @@ const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
 
-const toursRouter = require('./routes/tours');
-const adminToursRouter = require('./routes/adminTours');
+const packageToursRouter = require('./routes/packageTours');
+const adminPackageToursRouter = require('./routes/adminPackageTours');
+const dailyToursRouter = require('./routes/dailyTours');
+const adminDailyToursRouter = require('./routes/adminDailyTours');
+const activitiesRouter = require('./routes/activities');
+const adminActivitiesRouter = require('./routes/adminActivities');
+const blogRouter = require('./routes/blog');
+const adminBlogRouter = require('./routes/adminBlog');
+const adminUploadRouter = require('./routes/adminUpload');
 const authRouter = require('./routes/auth');
 const contactRouter = require('./routes/contact');
 const settingsRouter = require('./routes/settings');
@@ -16,20 +23,28 @@ const PORT = process.env.PORT || 4000;
 app.use(cors());
 app.use(express.json({ limit: '5mb' }));
 
-// Yüklenen görseller
+// Uploaded images
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// API rotaları
-app.use('/api/tours', toursRouter);
-app.use('/api/admin/tours', adminToursRouter);
+// API routes
+app.use('/api/package-tours', packageToursRouter);
+app.use('/api/admin/package-tours', adminPackageToursRouter);
+app.use('/api/daily-tours', dailyToursRouter);
+app.use('/api/admin/daily-tours', adminDailyToursRouter);
+app.use('/api/activities', activitiesRouter);
+app.use('/api/admin/activities', adminActivitiesRouter);
+app.use('/api/blog', blogRouter);
+app.use('/api/admin/blog', adminBlogRouter);
+app.use('/api/admin/upload', adminUploadRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/contact', contactRouter);
 app.use('/api/settings', settingsRouter);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
-// Üretimde React build'ini sun (server/public — Hostinger gibi platformlarda
-// "kök dizin" sadece server/ olabildiği için build çıktısını server içine koyuyoruz)
+// Serve the React build in production (server/public — on hosts like
+// Hostinger where the "root directory" can only be server/, we put the
+// build output inside server itself).
 const clientDist = path.join(__dirname, 'public');
 if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
@@ -39,12 +54,12 @@ if (fs.existsSync(clientDist)) {
   });
 }
 
-// Genel hata yakalayıcı (ör. multer dosya hataları)
+// Generic error handler (e.g. multer file errors)
 app.use((err, req, res, next) => {
   console.error(err);
-  res.status(500).json({ error: err.message || 'Sunucu hatası.' });
+  res.status(500).json({ error: err.message || 'Server error.' });
 });
 
 app.listen(PORT, () => {
-  console.log(`[server] http://localhost:${PORT} üzerinde çalışıyor`);
+  console.log(`[server] running on http://localhost:${PORT}`);
 });

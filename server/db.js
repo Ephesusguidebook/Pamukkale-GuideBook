@@ -2,16 +2,19 @@ const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 
-// Basit, bağımlılıksız JSON dosya tabanlı veri katmanı.
-// better-sqlite3 gibi native (derleme gerektiren) paketlere ihtiyaç duymaz,
-// bu yüzden kısıtlı build ortamlarında (ör. paylaşımlı hosting) sorunsuz çalışır.
+// Simple, dependency-free JSON file based data layer.
+// Avoids native (compiled) packages like better-sqlite3, so it runs fine on
+// restricted build environments (e.g. shared hosting).
 
 const DATA_FILE = path.join(__dirname, 'data.json');
 
 function emptyState() {
   return {
     adminUsers: [],
-    tours: [],
+    packageTours: [],
+    dailyTours: [],
+    activities: [],
+    blogPosts: [],
     contactMessages: [],
     settings: {
       consultant_name: '',
@@ -23,7 +26,10 @@ function emptyState() {
     },
     counters: {
       adminUsers: 0,
-      tours: 0,
+      packageTours: 0,
+      dailyTours: 0,
+      activities: 0,
+      blogPosts: 0,
       contactMessages: 0,
       images: 0,
       itinerary: 0,
@@ -38,12 +44,28 @@ function load() {
   try {
     const raw = fs.readFileSync(DATA_FILE, 'utf-8');
     const parsed = JSON.parse(raw);
-    return {
+    const merged = {
       ...base,
       ...parsed,
       settings: { ...base.settings, ...(parsed.settings || {}) },
       counters: { ...base.counters, ...(parsed.counters || {}) },
     };
+
+    // One-time migration from the old single "tours" collection (pre
+    // package-tours / daily-tours / activities split) into packageTours,
+    // so nothing that was already published gets silently lost.
+    if (Array.isArray(parsed.tours) && parsed.tours.length && merged.packageTours.length === 0) {
+      merged.packageTours = parsed.tours;
+      merged.counters.packageTours = parsed.counters?.tours || merged.counters.packageTours;
+      delete merged.tours;
+      console.log(
+        `[db] Migrated ${parsed.tours.length} legacy tour(s) into Package Tours. ` +
+          `Re-categorize them into Daily Tours / Activities from the admin panel if needed.`
+      );
+    }
+    delete merged.tours;
+
+    return merged;
   } catch {
     return base;
   }
@@ -54,6 +76,8 @@ let state = load();
 function persist() {
   fs.writeFileSync(DATA_FILE, JSON.stringify(state, null, 2));
 }
+// Run once at startup so a migrated legacy file is saved back in the new shape.
+persist();
 
 function nextId(key) {
   state.counters[key] = (state.counters[key] || 0) + 1;
@@ -64,7 +88,7 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-// --- Admin kullanıcıları ---
+// --- Admin users ---
 const adminUsers = {
   findByEmail(email) {
     const e = String(email || '').toLowerCase().trim();
@@ -89,36 +113,14 @@ function ensureAdminUser() {
   if (!adminUsers.findByEmail(email)) {
     const hash = bcrypt.hashSync(password, 10);
     adminUsers.create(email, hash);
-    console.log(`[db] Admin kullanıcısı oluşturuldu: ${email.toLowerCase().trim()}`);
+    console.log(`[db] Admin user created: ${email.toLowerCase().trim()}`);
   }
 }
 ensureAdminUser();
 
-// --- Turlar ---
-function normalizeTourInput(input) {
-  const originalPrice = Number(input.original_price) || 0;
-  return {
-    title: input.title,
-    summary: input.summary || '',
-    description: input.description || '',
-    price: Number(input.price) || 0,
-    original_price: originalPrice,
-    price_note: input.price_note || '',
-    currency: input.currency || 'TRY',
-    duration_days: Number(input.duration_days) || 1,
-    location: input.location || '',
-    start_date: input.start_date || '',
-    capacity: Number(input.capacity) || 0,
-    status: input.status === 'draft' ? 'draft' : 'published',
-    cover_image: input.cover_image || '',
-    languages: normalizeStringList(input.languages),
-    highlights: normalizeStringList(input.highlights),
-    included: normalizeStringList(input.included),
-    excluded: normalizeStringList(input.excluded),
-  };
-}
+// --- Shared helpers for tour-like entries (package tours, daily tours, activities) ---
 
-// Hem dizi hem satır satır metin girişini kabul eder ("A\nB\nC" -> ["A","B","C"]).
+// Accepts both an array and line-separated text ("A\nB\nC" -> ["A","B","C"]).
 function normalizeStringList(value) {
   if (Array.isArray(value)) {
     return value.map((v) => String(v).trim()).filter(Boolean);
@@ -130,6 +132,29 @@ function normalizeStringList(value) {
       .filter(Boolean);
   }
   return [];
+}
+
+function normalizeEntryInput(input) {
+  const originalPrice = Number(input.original_price) || 0;
+  return {
+    title: input.title,
+    summary: input.summary || '',
+    description: input.description || '',
+    price: Number(input.price) || 0,
+    original_price: originalPrice,
+    price_note: input.price_note || '',
+    currency: input.currency || 'USD',
+    duration_days: Number(input.duration_days) || 1,
+    location: input.location || '',
+    start_date: input.start_date || '',
+    capacity: Number(input.capacity) || 0,
+    status: input.status === 'draft' ? 'draft' : 'published',
+    cover_image: input.cover_image || '',
+    languages: normalizeStringList(input.languages),
+    highlights: normalizeStringList(input.highlights),
+    included: normalizeStringList(input.included),
+    excluded: normalizeStringList(input.excluded),
+  };
 }
 
 function normalizeImages(images) {
@@ -164,71 +189,153 @@ function normalizeRoute(route) {
     .filter((p) => p.name && Number.isFinite(p.lat) && Number.isFinite(p.lng));
 }
 
-const tours = {
+// Factory shared by Package Tours, Daily Tours and Activities: each is kept
+// as its own independent collection (own admin screens, own API routes),
+// but they share the same entry shape and CRUD behaviour.
+function createEntryCollection(stateKey) {
+  return {
+    listPublished() {
+      return state[stateKey]
+        .filter((t) => t.status === 'published')
+        .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+    },
+    listAll() {
+      return [...state[stateKey]].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+    },
+    getById(id) {
+      return state[stateKey].find((t) => t.id === Number(id)) || null;
+    },
+    getPublishedBySlug(slug) {
+      return state[stateKey].find((t) => t.slug === slug && t.status === 'published') || null;
+    },
+    slugExists(slug, ignoreId) {
+      return state[stateKey].some((t) => t.slug === slug && t.id !== ignoreId);
+    },
+    create(input) {
+      const item = {
+        id: nextId(stateKey),
+        slug: input.slug,
+        ...normalizeEntryInput(input),
+        images: normalizeImages(input.images),
+        itinerary: normalizeItinerary(input.itinerary),
+        route: normalizeRoute(input.route),
+        created_at: nowIso(),
+        updated_at: nowIso(),
+      };
+      state[stateKey].push(item);
+      persist();
+      return item;
+    },
+    update(id, input) {
+      const idx = state[stateKey].findIndex((t) => t.id === Number(id));
+      if (idx === -1) return null;
+      const existing = state[stateKey][idx];
+      const updated = {
+        ...existing,
+        slug: input.slug || existing.slug,
+        ...normalizeEntryInput(input),
+        images: normalizeImages(input.images),
+        itinerary: normalizeItinerary(input.itinerary),
+        route: normalizeRoute(input.route),
+        updated_at: nowIso(),
+      };
+      state[stateKey][idx] = updated;
+      persist();
+      return updated;
+    },
+    remove(id) {
+      const idx = state[stateKey].findIndex((t) => t.id === Number(id));
+      if (idx === -1) return false;
+      state[stateKey].splice(idx, 1);
+      persist();
+      return true;
+    },
+  };
+}
+
+const packageTours = createEntryCollection('packageTours');
+const dailyTours = createEntryCollection('dailyTours');
+const activities = createEntryCollection('activities');
+
+// --- Blog ---
+function normalizeBlogInput(input) {
+  return {
+    title: input.title,
+    excerpt: input.excerpt || '',
+    content: input.content || '',
+    cover_image: input.cover_image || '',
+    author: input.author || '',
+    status: input.status === 'draft' ? 'draft' : 'published',
+  };
+}
+
+const blogPosts = {
   listPublished() {
-    return state.tours
-      .filter((t) => t.status === 'published')
+    return state.blogPosts
+      .filter((p) => p.status === 'published')
       .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
   },
   listAll() {
-    return [...state.tours].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+    return [...state.blogPosts].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
   },
   getById(id) {
-    return state.tours.find((t) => t.id === Number(id)) || null;
+    return state.blogPosts.find((p) => p.id === Number(id)) || null;
   },
   getPublishedBySlug(slug) {
-    return state.tours.find((t) => t.slug === slug && t.status === 'published') || null;
+    return state.blogPosts.find((p) => p.slug === slug && p.status === 'published') || null;
   },
   slugExists(slug, ignoreId) {
-    return state.tours.some((t) => t.slug === slug && t.id !== ignoreId);
+    return state.blogPosts.some((p) => p.slug === slug && p.id !== ignoreId);
   },
   create(input) {
-    const tour = {
-      id: nextId('tours'),
+    const post = {
+      id: nextId('blogPosts'),
       slug: input.slug,
-      ...normalizeTourInput(input),
-      images: normalizeImages(input.images),
-      itinerary: normalizeItinerary(input.itinerary),
-      route: normalizeRoute(input.route),
+      ...normalizeBlogInput(input),
       created_at: nowIso(),
       updated_at: nowIso(),
     };
-    state.tours.push(tour);
+    state.blogPosts.push(post);
     persist();
-    return tour;
+    return post;
   },
   update(id, input) {
-    const idx = state.tours.findIndex((t) => t.id === Number(id));
+    const idx = state.blogPosts.findIndex((p) => p.id === Number(id));
     if (idx === -1) return null;
-    const existing = state.tours[idx];
+    const existing = state.blogPosts[idx];
     const updated = {
       ...existing,
       slug: input.slug || existing.slug,
-      ...normalizeTourInput(input),
-      images: normalizeImages(input.images),
-      itinerary: normalizeItinerary(input.itinerary),
-      route: normalizeRoute(input.route),
+      ...normalizeBlogInput(input),
       updated_at: nowIso(),
     };
-    state.tours[idx] = updated;
+    state.blogPosts[idx] = updated;
     persist();
     return updated;
   },
   remove(id) {
-    const idx = state.tours.findIndex((t) => t.id === Number(id));
+    const idx = state.blogPosts.findIndex((p) => p.id === Number(id));
     if (idx === -1) return false;
-    state.tours.splice(idx, 1);
+    state.blogPosts.splice(idx, 1);
     persist();
     return true;
   },
 };
 
-// --- İletişim mesajları ---
+// --- Contact messages ---
+// item_type is one of: 'package_tour' | 'daily_tour' | 'activity' | null
+const ITEM_COLLECTIONS = {
+  package_tour: () => packageTours,
+  daily_tour: () => dailyTours,
+  activity: () => activities,
+};
+
 const contactMessages = {
   create(input) {
     const msg = {
       id: nextId('contactMessages'),
-      tour_id: input.tour_id ? Number(input.tour_id) : null,
+      item_type: ITEM_COLLECTIONS[input.item_type] ? input.item_type : null,
+      item_id: input.item_id ? Number(input.item_id) : null,
       name: input.name,
       email: input.email,
       phone: input.phone || '',
@@ -240,12 +347,16 @@ const contactMessages = {
     persist();
     return msg;
   },
-  listWithTourTitle() {
+  listWithItemTitle() {
     return [...state.contactMessages]
       .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
       .map((m) => {
-        const tour = m.tour_id ? tours.getById(m.tour_id) : null;
-        return { ...m, tour_title: tour ? tour.title : null };
+        let item_title = null;
+        if (m.item_id && m.item_type && ITEM_COLLECTIONS[m.item_type]) {
+          const item = ITEM_COLLECTIONS[m.item_type]().getById(m.item_id);
+          item_title = item ? item.title : null;
+        }
+        return { ...m, item_title };
       });
   },
   markRead(id) {
@@ -257,7 +368,7 @@ const contactMessages = {
   },
 };
 
-// --- Site ayarları (Travel Consultant bilgisi vb.) ---
+// --- Site settings (Travel Consultant card, etc.) ---
 const settings = {
   get() {
     return state.settings;
@@ -276,4 +387,12 @@ const settings = {
   },
 };
 
-module.exports = { adminUsers, tours, contactMessages, settings };
+module.exports = {
+  adminUsers,
+  packageTours,
+  dailyTours,
+  activities,
+  blogPosts,
+  contactMessages,
+  settings,
+};

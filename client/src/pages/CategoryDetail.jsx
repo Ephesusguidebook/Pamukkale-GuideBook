@@ -7,9 +7,9 @@ import RouteMap from '../components/RouteMap';
 
 function formatPrice(price, currency) {
   try {
-    return new Intl.NumberFormat('tr-TR', {
+    return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: currency || 'TRY',
+      currency: currency || 'USD',
       maximumFractionDigits: 0,
     }).format(price || 0);
   } catch {
@@ -17,9 +17,10 @@ function formatPrice(price, currency) {
   }
 }
 
-export default function TourDetail() {
+// Generic detail page reused for Package Tours, Daily Tours and Activities.
+export default function CategoryDetail({ category }) {
   const { slug } = useParams();
-  const [tour, setTour] = useState(null);
+  const [item, setItem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [activeImage, setActiveImage] = useState(0);
@@ -29,10 +30,10 @@ export default function TourDetail() {
     setLoading(true);
     setNotFound(false);
     api
-      .get(`/tours/${slug}`)
+      .get(`${category.apiBase}/${slug}`)
       .then((res) => {
         if (active) {
-          setTour(res.data);
+          setItem(res.data);
           setActiveImage(0);
         }
       })
@@ -45,47 +46,60 @@ export default function TourDetail() {
     return () => {
       active = false;
     };
-  }, [slug]);
+  }, [slug, category.apiBase]);
 
   if (loading) {
-    return <div className="mx-auto max-w-6xl px-4 py-16 text-gray-500 sm:px-6">Yükleniyor...</div>;
+    return (
+      <div className="mx-auto max-w-6xl px-4 py-16 text-gray-500 sm:px-6">Loading...</div>
+    );
   }
 
-  if (notFound || !tour) {
+  if (notFound || !item) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-16 text-center sm:px-6">
-        <h1 className="text-2xl font-bold text-gray-900">Tur bulunamadı</h1>
-        <p className="mt-2 text-gray-500">Bu tur kaldırılmış ya da yayında olmayabilir.</p>
-        <Link to="/turlar" className="btn-primary mt-6 inline-flex">
-          Turlara dön
+        <h1 className="text-2xl font-bold text-gray-900">{category.label} not found</h1>
+        <p className="mt-2 text-gray-500">
+          This {category.label.toLowerCase()} may have been removed or is not published.
+        </p>
+        <Link to={category.publicPath} className="btn-primary mt-6 inline-flex">
+          Back to {category.pluralLabel}
         </Link>
       </div>
     );
   }
 
-  const images = tour.images && tour.images.length ? tour.images : (tour.cover_image ? [{ url: tour.cover_image }] : []);
-  const mainImage = images[activeImage]?.url || tour.cover_image;
-  const hasDiscount = tour.original_price > 0 && tour.original_price > tour.price;
+  const images =
+    item.images && item.images.length
+      ? item.images
+      : item.cover_image
+        ? [{ url: item.cover_image }]
+        : [];
+  const mainImage = images[activeImage]?.url || item.cover_image;
+  const hasDiscount = item.original_price > 0 && item.original_price > item.price;
   const discountPct = hasDiscount
-    ? Math.round(100 - (tour.price / tour.original_price) * 100)
+    ? Math.round(100 - (item.price / item.original_price) * 100)
     : 0;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
       <nav className="mb-6 text-sm text-gray-500">
-        <Link to="/turlar" className="hover:text-teal-700">Turlar</Link>
+        <Link to={category.publicPath} className="hover:text-teal-700">
+          {category.pluralLabel}
+        </Link>
         <span className="mx-2">/</span>
-        <span className="text-gray-700">{tour.title}</span>
+        <span className="text-gray-700">{item.title}</span>
       </nav>
 
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          {/* --- Galeri --- */}
+          {/* --- Gallery --- */}
           <div className="aspect-[16/9] w-full overflow-hidden rounded-2xl bg-gray-100">
             {mainImage ? (
-              <img src={mainImage} alt={tour.title} className="h-full w-full object-cover" />
+              <img src={mainImage} alt={item.title} className="h-full w-full object-cover" />
             ) : (
-              <div className="flex h-full items-center justify-center text-gray-300">Görsel yok</div>
+              <div className="flex h-full items-center justify-center text-gray-300">
+                No image
+              </div>
             )}
           </div>
           {images.length > 1 && (
@@ -104,46 +118,49 @@ export default function TourDetail() {
             </div>
           )}
 
-          <h1 className="mt-8 text-3xl font-bold text-gray-900">{tour.title}</h1>
+          <h1 className="mt-8 text-3xl font-bold text-gray-900">{item.title}</h1>
           <div className="mt-2 flex flex-wrap gap-3 text-sm text-gray-500">
-            {tour.location && <span>📍 {tour.location}</span>}
-            <span>🗓️ {tour.duration_days} gün {Math.max(tour.duration_days - 1, 0)} gece</span>
-            {tour.start_date && <span>▶️ Başlangıç: {tour.start_date}</span>}
-            {tour.capacity > 0 && <span>👥 Kontenjan: {tour.capacity}</span>}
+            {item.location && <span>📍 {item.location}</span>}
+            <span>
+              🗓️ {item.duration_days} {item.duration_days === 1 ? 'day' : 'days'}
+              {item.duration_days > 1 ? `, ${item.duration_days - 1} nights` : ''}
+            </span>
+            {item.start_date && <span>▶️ Start date: {item.start_date}</span>}
+            {item.capacity > 0 && <span>👥 Capacity: {item.capacity}</span>}
           </div>
 
-          {/* --- Tour Overview --- */}
-          {tour.description && (
+          {/* --- Overview --- */}
+          {item.description && (
             <div className="mt-6">
-              <h2 className="text-xl font-bold text-gray-900">Tur Hakkında</h2>
+              <h2 className="text-xl font-bold text-gray-900">Overview</h2>
               <div className="prose mt-3 max-w-none whitespace-pre-line text-gray-700">
-                {tour.description}
+                {item.description}
               </div>
             </div>
           )}
 
-          {/* --- Rota / Harita --- */}
-          {tour.route && tour.route.length > 0 && (
+          {/* --- Route / map --- */}
+          {item.route && item.route.length > 0 && (
             <div className="mt-10">
-              <h2 className="text-xl font-bold text-gray-900">Tur Rotası</h2>
+              <h2 className="text-xl font-bold text-gray-900">Route</h2>
               <div className="mt-4">
-                <RouteMap points={tour.route} />
+                <RouteMap points={item.route} />
               </div>
             </div>
           )}
 
-          {/* --- Itinerary zaman çizgisi --- */}
-          {tour.itinerary && tour.itinerary.length > 0 && (
+          {/* --- Itinerary timeline --- */}
+          {item.itinerary && item.itinerary.length > 0 && (
             <div className="mt-10">
-              <h2 className="text-xl font-bold text-gray-900">Gün Gün Program</h2>
+              <h2 className="text-xl font-bold text-gray-900">Itinerary</h2>
               <ol className="relative mt-6 space-y-8 border-l-2 border-teal-100 pl-8">
-                {tour.itinerary.map((day) => (
+                {item.itinerary.map((day) => (
                   <li key={day.id} className="relative">
                     <span className="absolute -left-[41px] flex h-8 w-8 items-center justify-center rounded-full bg-teal-700 text-xs font-bold text-white ring-4 ring-white">
                       {String(day.day_number).padStart(2, '0')}
                     </span>
                     <p className="text-base font-semibold text-teal-700">
-                      {day.title || `${day.day_number}. Gün`}
+                      {day.title || `Day ${day.day_number}`}
                     </p>
                     {day.details && (
                       <p className="mt-1 whitespace-pre-line text-sm text-gray-600">
@@ -156,29 +173,29 @@ export default function TourDetail() {
             </div>
           )}
 
-          {/* --- Dahil / Hariç --- */}
-          {(tour.included?.length > 0 || tour.excluded?.length > 0) && (
+          {/* --- Included / excluded --- */}
+          {(item.included?.length > 0 || item.excluded?.length > 0) && (
             <div className="mt-10 rounded-2xl bg-gray-50 p-6">
-              <h2 className="text-lg font-bold text-gray-900">Dahil ve Hariç Olanlar</h2>
+              <h2 className="text-lg font-bold text-gray-900">What's Included / Excluded</h2>
               <div className="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2">
                 <div>
-                  <p className="mb-2 text-sm font-semibold text-gray-700">Dahil</p>
+                  <p className="mb-2 text-sm font-semibold text-gray-700">Included</p>
                   <ul className="space-y-1.5 text-sm text-gray-600">
-                    {(tour.included || []).map((item, idx) => (
+                    {(item.included || []).map((i, idx) => (
                       <li key={idx} className="flex items-start gap-2">
                         <span className="mt-0.5 text-teal-600">✓</span>
-                        {item}
+                        {i}
                       </li>
                     ))}
                   </ul>
                 </div>
                 <div>
-                  <p className="mb-2 text-sm font-semibold text-gray-700">Hariç</p>
+                  <p className="mb-2 text-sm font-semibold text-gray-700">Excluded</p>
                   <ul className="space-y-1.5 text-sm text-gray-600">
-                    {(tour.excluded || []).map((item, idx) => (
+                    {(item.excluded || []).map((i, idx) => (
                       <li key={idx} className="flex items-start gap-2">
                         <span className="mt-0.5 text-red-400">✕</span>
-                        {item}
+                        {i}
                       </li>
                     ))}
                   </ul>
@@ -187,10 +204,10 @@ export default function TourDetail() {
             </div>
           )}
 
-          {/* --- Fotoğraf Galerisi --- */}
+          {/* --- Photo gallery --- */}
           {images.length > 0 && (
             <div className="mt-10">
-              <h2 className="text-lg font-bold text-gray-900">Fotoğraf Galerisi</h2>
+              <h2 className="text-lg font-bold text-gray-900">Photo Gallery</h2>
               <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {images.map((img, idx) => (
                   <button
@@ -198,7 +215,11 @@ export default function TourDetail() {
                     onClick={() => setActiveImage(idx)}
                     className="aspect-square overflow-hidden rounded-lg bg-gray-100"
                   >
-                    <img src={img.url} alt="" className="h-full w-full object-cover transition hover:scale-105" />
+                    <img
+                      src={img.url}
+                      alt=""
+                      className="h-full w-full object-cover transition hover:scale-105"
+                    />
                   </button>
                 ))}
               </div>
@@ -209,25 +230,26 @@ export default function TourDetail() {
         {/* --- Sidebar --- */}
         <div className="space-y-6">
           <div className="card p-5">
-            {tour.duration_days > 0 && (
+            {item.duration_days > 0 && (
               <div className="flex items-center justify-between border-b border-gray-100 py-2 text-sm">
-                <span className="text-gray-500">Süre</span>
+                <span className="text-gray-500">Duration</span>
                 <span className="font-medium text-gray-800">
-                  {tour.duration_days} Gün {Math.max(tour.duration_days - 1, 0)} Gece
+                  {item.duration_days} {item.duration_days === 1 ? 'Day' : 'Days'}
+                  {item.duration_days > 1 ? `, ${item.duration_days - 1} Nights` : ''}
                 </span>
               </div>
             )}
-            {tour.languages?.length > 0 && (
+            {item.languages?.length > 0 && (
               <div className="flex items-center justify-between border-b border-gray-100 py-2 text-sm">
-                <span className="text-gray-500">Diller</span>
-                <span className="font-medium text-gray-800">{tour.languages.join(', ')}</span>
+                <span className="text-gray-500">Languages</span>
+                <span className="font-medium text-gray-800">{item.languages.join(', ')}</span>
               </div>
             )}
-            {tour.highlights?.length > 0 && (
+            {item.highlights?.length > 0 && (
               <div className="py-2">
-                <p className="mb-2 text-sm text-gray-500">Tur Öne Çıkanları</p>
+                <p className="mb-2 text-sm text-gray-500">Highlights</p>
                 <ul className="space-y-1.5 text-sm">
-                  {tour.highlights.map((h, idx) => (
+                  {item.highlights.map((h, idx) => (
                     <li key={idx} className="flex items-center gap-2 text-gray-700">
                       <span className="text-teal-600">✓</span>
                       {h}
@@ -242,23 +264,27 @@ export default function TourDetail() {
             <div className="flex items-baseline gap-2">
               {hasDiscount && (
                 <span className="text-sm text-gray-400 line-through">
-                  {formatPrice(tour.original_price, tour.currency)}
+                  {formatPrice(item.original_price, item.currency)}
                 </span>
               )}
               {hasDiscount && (
                 <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white">
-                  -%{discountPct}
+                  -{discountPct}%
                 </span>
               )}
             </div>
             <p className="text-3xl font-bold text-teal-700">
-              {formatPrice(tour.price, tour.currency)}
-              <span className="ml-1 text-sm font-normal text-gray-400">/ kişi</span>
+              {formatPrice(item.price, item.currency)}
+              <span className="ml-1 text-sm font-normal text-gray-400">/ person</span>
             </p>
-            {tour.price_note && <p className="mt-1 text-xs text-gray-500">{tour.price_note}</p>}
+            {item.price_note && <p className="mt-1 text-xs text-gray-500">{item.price_note}</p>}
           </div>
 
-          <ContactForm tourId={tour.id} tourTitle={tour.title} />
+          <ContactForm
+            itemType={category.contactItemType}
+            itemId={item.id}
+            itemTitle={item.title}
+          />
 
           <ConsultantCard />
         </div>

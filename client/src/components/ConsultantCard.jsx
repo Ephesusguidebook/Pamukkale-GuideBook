@@ -25,7 +25,7 @@ export default function ConsultantCard() {
 
   return (
     <div className="card p-5">
-      <p className="mb-3 text-sm font-semibold text-gray-500">Seyahat Danışmanı</p>
+      <p className="mb-3 text-sm font-semibold text-gray-500">Travel Consultant</p>
       <div className="flex items-center gap-3">
         {settings.consultant_photo ? (
           <img
@@ -65,7 +65,7 @@ export default function ConsultantCard() {
             href={`mailto:${settings.consultant_email}`}
             className="btn-primary flex-1 !py-2 text-xs"
           >
-            E-posta
+            Email
           </a>
         )}
       </div>

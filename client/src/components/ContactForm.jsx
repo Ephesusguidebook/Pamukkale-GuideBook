@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import api from '../api';
 
-export default function ContactForm({ tourId, tourTitle }) {
+export default function ContactForm({ itemType, itemId, itemTitle }) {
   const [form, setForm] = useState({ name: '', email: '', phone: '', message: '' });
   const [status, setStatus] = useState('idle'); // idle | sending | sent | error
   const [error, setError] = useState('');
@@ -15,35 +15,37 @@ export default function ContactForm({ tourId, tourTitle }) {
     setStatus('sending');
     setError('');
     try {
-      await api.post('/contact', { ...form, tour_id: tourId || null });
+      await api.post('/contact', {
+        ...form,
+        item_type: itemType || null,
+        item_id: itemId || null,
+      });
       setStatus('sent');
       setForm({ name: '', email: '', phone: '', message: '' });
     } catch (err) {
       setStatus('error');
-      setError(err.response?.data?.error || 'Mesaj gönderilemedi, tekrar deneyin.');
+      setError(err.response?.data?.error || 'Could not send your message, please try again.');
     }
   }
 
   if (status === 'sent') {
     return (
       <div className="card p-6 text-center">
-        <p className="text-lg font-semibold text-teal-700">Mesajınız alındı!</p>
-        <p className="mt-1 text-sm text-gray-500">
-          En kısa sürede size dönüş yapacağız.
-        </p>
+        <p className="text-lg font-semibold text-teal-700">Message received!</p>
+        <p className="mt-1 text-sm text-gray-500">We'll get back to you shortly.</p>
       </div>
     );
   }
 
   return (
     <form onSubmit={handleSubmit} className="card space-y-4 p-6">
-      {tourTitle && (
+      {itemTitle && (
         <p className="text-sm text-gray-500">
-          İlgilendiğiniz tur: <span className="font-medium text-gray-800">{tourTitle}</span>
+          Interested in: <span className="font-medium text-gray-800">{itemTitle}</span>
         </p>
       )}
       <div>
-        <label className="label">Ad Soyad</label>
+        <label className="label">Full Name</label>
         <input
           className="input"
           required
@@ -53,7 +55,7 @@ export default function ContactForm({ tourId, tourTitle }) {
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="label">E-posta</label>
+          <label className="label">Email</label>
           <input
             type="email"
             className="input"
@@ -63,7 +65,7 @@ export default function ContactForm({ tourId, tourTitle }) {
           />
         </div>
         <div>
-          <label className="label">Telefon</label>
+          <label className="label">Phone</label>
           <input
             className="input"
             value={form.phone}
@@ -72,7 +74,7 @@ export default function ContactForm({ tourId, tourTitle }) {
         </div>
       </div>
       <div>
-        <label className="label">Mesajınız</label>
+        <label className="label">Message</label>
         <textarea
           className="input"
           rows={4}
@@ -82,7 +84,7 @@ export default function ContactForm({ tourId, tourTitle }) {
       </div>
       {status === 'error' && <p className="text-sm text-red-600">{error}</p>}
       <button type="submit" className="btn-primary w-full" disabled={status === 'sending'}>
-        {status === 'sending' ? 'Gönderiliyor...' : 'Gönder'}
+        {status === 'sending' ? 'Sending...' : 'Send'}
       </button>
     </form>
   );

@@ -1,7 +1,7 @@
 import { Component } from 'react';
 
-// Beklenmeyen bir render hatası olursa kullanıcıya boş beyaz ekran yerine
-// anlaşılır bir mesaj gösterir; site tamamen çökmez.
+// Catches unexpected render errors so the visitor sees a friendly message
+// instead of a blank white screen; the site never fully crashes.
 class ErrorBoundary extends Component {
   constructor(props) {
     super(props);
@@ -13,8 +13,8 @@ class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
-    // İstersen burada bir hata izleme servisine (Sentry vb.) log gönderebilirsin.
-    console.error('Render hatası yakalandı:', error, info);
+    // Hook up an error tracking service (e.g. Sentry) here if desired.
+    console.error('Render error caught:', error, info);
   }
 
   handleReset = () => {
@@ -26,13 +26,13 @@ class ErrorBoundary extends Component {
     if (this.state.hasError) {
       return (
         <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-cream px-6 text-center">
-          <h1 className="text-2xl font-bold text-gray-800">Bir şeyler ters gitti</h1>
+          <h1 className="text-2xl font-bold text-gray-800">Something went wrong</h1>
           <p className="max-w-md text-gray-600">
-            Sayfa yüklenirken beklenmeyen bir hata oluştu. Ana sayfaya dönüp tekrar
-            deneyebilirsin.
+            An unexpected error occurred while loading the page. You can head back to the
+            homepage and try again.
           </p>
           <button onClick={this.handleReset} className="btn-primary">
-            Ana sayfaya dön
+            Back to homepage
           </button>
         </div>
       );

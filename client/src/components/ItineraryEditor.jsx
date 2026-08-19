@@ -19,7 +19,7 @@ export default function ItineraryEditor({ days, onChange }) {
         <div key={idx} className="rounded-lg border border-gray-200 p-3">
           <div className="flex items-center gap-3">
             <div className="w-20">
-              <label className="label">Gün</label>
+              <label className="label">Day</label>
               <input
                 type="number"
                 min={1}
@@ -29,10 +29,10 @@ export default function ItineraryEditor({ days, onChange }) {
               />
             </div>
             <div className="flex-1">
-              <label className="label">Başlık</label>
+              <label className="label">Title</label>
               <input
                 className="input"
-                placeholder="Örn: Varış ve Şehir Turu"
+                placeholder="e.g. Arrival and City Tour"
                 value={day.title}
                 onChange={(e) => updateDay(idx, 'title', e.target.value)}
               />
@@ -42,15 +42,15 @@ export default function ItineraryEditor({ days, onChange }) {
               onClick={() => removeDay(idx)}
               className="btn-danger !px-3 !py-2 self-end text-xs"
             >
-              Kaldır
+              Remove
             </button>
           </div>
           <div className="mt-2">
-            <label className="label">Detaylar</label>
+            <label className="label">Details</label>
             <textarea
               className="input"
               rows={2}
-              placeholder="Bu güne ait program detaylarını yazın..."
+              placeholder="Describe what happens on this day..."
               value={day.details}
               onChange={(e) => updateDay(idx, 'details', e.target.value)}
             />
@@ -58,7 +58,7 @@ export default function ItineraryEditor({ days, onChange }) {
         </div>
       ))}
       <button type="button" onClick={addDay} className="btn-secondary">
-        + Gün Ekle
+        + Add Day
       </button>
     </div>
   );

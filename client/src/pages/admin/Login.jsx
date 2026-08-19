@@ -20,7 +20,7 @@ export default function Login() {
       const to = location.state?.from || '/admin';
       navigate(to, { replace: true });
     } catch (err) {
-      setError(err.response?.data?.error || 'Giriş başarısız.');
+      setError(err.response?.data?.error || 'Login failed.');
     } finally {
       setLoading(false);
     }
@@ -28,10 +28,10 @@ export default function Login() {
 
   return (
     <div className="mx-auto flex min-h-[70vh] max-w-md flex-col justify-center px-4 py-14 sm:px-6">
-      <h1 className="text-center text-2xl font-bold text-gray-900">Yönetici Girişi</h1>
+      <h1 className="text-center text-2xl font-bold text-gray-900">Admin Login</h1>
       <form onSubmit={handleSubmit} className="card mt-8 space-y-4 p-6">
         <div>
-          <label className="label">E-posta</label>
+          <label className="label">Email</label>
           <input
             type="email"
             className="input"
@@ -41,7 +41,7 @@ export default function Login() {
           />
         </div>
         <div>
-          <label className="label">Şifre</label>
+          <label className="label">Password</label>
           <input
             type="password"
             className="input"
@@ -52,7 +52,7 @@ export default function Login() {
         </div>
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button type="submit" className="btn-primary w-full" disabled={loading}>
-          {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
+          {loading ? 'Logging in...' : 'Log In'}
         </button>
       </form>
     </div>

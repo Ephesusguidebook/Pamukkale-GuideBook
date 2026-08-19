@@ -5,14 +5,14 @@ import ImageUploader from '../../components/ImageUploader';
 import ItineraryEditor from '../../components/ItineraryEditor';
 import RouteEditor from '../../components/RouteEditor';
 
-const emptyTour = {
+const emptyItem = {
   title: '',
   summary: '',
   description: '',
   price: '',
   original_price: '',
   price_note: '',
-  currency: 'TRY',
+  currency: 'USD',
   duration_days: 1,
   location: '',
   start_date: '',
@@ -27,7 +27,7 @@ const emptyTour = {
   route: [],
 };
 
-// Diziyi satır satır metne çevirir ve tersini yapar (textarea alanları için).
+// Converts a list to newline-separated text and back (for textarea fields).
 function listToText(list) {
   return (list || []).join('\n');
 }
@@ -38,24 +38,28 @@ function textToList(text) {
     .filter(Boolean);
 }
 
-export default function TourForm() {
+// Generic admin create/edit form reused for Package Tours, Daily Tours and
+// Activities — each still saves to its own API base (category.adminApiBase).
+export default function AdminCategoryForm({ category }) {
   const { id } = useParams();
-  const isEdit = id && id !== 'yeni';
+  const isEdit = id && id !== 'new';
   const navigate = useNavigate();
 
-  const [form, setForm] = useState(emptyTour);
+  const [form, setForm] = useState(emptyItem);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
+    setForm(emptyItem);
     if (!isEdit) return;
+    setLoading(true);
     api
-      .get(`/admin/tours/${id}`)
+      .get(`${category.adminApiBase}/${id}`)
       .then((res) => {
         const t = res.data;
         setForm({
-          ...emptyTour,
+          ...emptyItem,
           ...t,
           price: t.price ?? '',
           original_price: t.original_price || '',
@@ -69,9 +73,9 @@ export default function TourForm() {
           excluded: t.excluded || [],
         });
       })
-      .catch(() => setError('Tur bilgileri yüklenemedi.'))
+      .catch(() => setError(`Could not load this ${category.label.toLowerCase()}.`))
       .finally(() => setLoading(false));
-  }, [id, isEdit]);
+  }, [id, isEdit, category.adminApiBase, category.label]);
 
   function update(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -80,7 +84,7 @@ export default function TourForm() {
   async function handleSubmit(e, statusOverride) {
     e.preventDefault();
     if (!form.title.trim()) {
-      setError('Başlık zorunlu.');
+      setError('Title is required.');
       return;
     }
     setSaving(true);
@@ -92,31 +96,31 @@ export default function TourForm() {
         cover_image: form.images[0]?.url || '',
       };
       if (isEdit) {
-        await api.put(`/admin/tours/${id}`, payload);
+        await api.put(`${category.adminApiBase}/${id}`, payload);
       } else {
-        await api.post('/admin/tours', payload);
+        await api.post(category.adminApiBase, payload);
       }
-      navigate('/admin');
+      navigate(category.adminPath);
     } catch (err) {
-      setError(err.response?.data?.error || 'Kaydetme sırasında bir hata oluştu.');
+      setError(err.response?.data?.error || 'Something went wrong while saving.');
     } finally {
       setSaving(false);
     }
   }
 
-  if (loading) return <p className="text-gray-500">Yükleniyor...</p>;
+  if (loading) return <p className="text-gray-500">Loading...</p>;
 
   return (
     <div className="max-w-3xl">
       <h1 className="mb-6 text-2xl font-bold text-gray-900">
-        {isEdit ? 'Turu Düzenle' : 'Yeni Tur Ekle'}
+        {isEdit ? `Edit ${category.label}` : `Add ${category.label}`}
       </h1>
 
       <form onSubmit={(e) => handleSubmit(e)} className="space-y-6">
         <div className="card space-y-4 p-6">
-          <h2 className="font-semibold text-gray-800">Temel Bilgiler</h2>
+          <h2 className="font-semibold text-gray-800">Basic Information</h2>
           <div>
-            <label className="label">Tur Başlığı *</label>
+            <label className="label">Title *</label>
             <input
               className="input"
               required
@@ -125,16 +129,16 @@ export default function TourForm() {
             />
           </div>
           <div>
-            <label className="label">Kısa Özet</label>
+            <label className="label">Short Summary</label>
             <input
               className="input"
-              placeholder="Liste kartlarında görünecek kısa açıklama"
+              placeholder="Shown on listing cards"
               value={form.summary}
               onChange={(e) => update('summary', e.target.value)}
             />
           </div>
           <div>
-            <label className="label">Detaylı Açıklama (Tour Overview)</label>
+            <label className="label">Overview</label>
             <textarea
               className="input"
               rows={5}
@@ -143,7 +147,7 @@ export default function TourForm() {
             />
           </div>
           <div>
-            <label className="label">Diller (virgülle ayır — örn: TR, EN, ES)</label>
+            <label className="label">Languages (comma-separated — e.g. EN, TR, ES)</label>
             <input
               className="input"
               value={form.languages.join(', ')}
@@ -158,10 +162,10 @@ export default function TourForm() {
         </div>
 
         <div className="card space-y-4 p-6">
-          <h2 className="font-semibold text-gray-800">Fiyat ve Kapasite</h2>
+          <h2 className="font-semibold text-gray-800">Price and Capacity</h2>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <div>
-              <label className="label">Fiyat (indirimli/güncel)</label>
+              <label className="label">Price (current)</label>
               <input
                 type="number"
                 min={0}
@@ -171,30 +175,31 @@ export default function TourForm() {
               />
             </div>
             <div>
-              <label className="label">Eski Fiyat (opsiyonel)</label>
+              <label className="label">Original Price (optional)</label>
               <input
                 type="number"
                 min={0}
                 className="input"
-                placeholder="İndirim göstermek için"
+                placeholder="To show a discount"
                 value={form.original_price}
                 onChange={(e) => update('original_price', e.target.value)}
               />
             </div>
             <div>
-              <label className="label">Para Birimi</label>
+              <label className="label">Currency</label>
               <select
                 className="input"
                 value={form.currency}
                 onChange={(e) => update('currency', e.target.value)}
               >
-                <option value="TRY">TRY</option>
                 <option value="USD">USD</option>
                 <option value="EUR">EUR</option>
+                <option value="TRY">TRY</option>
+                <option value="GBP">GBP</option>
               </select>
             </div>
             <div>
-              <label className="label">Süre (gün)</label>
+              <label className="label">Duration (days)</label>
               <input
                 type="number"
                 min={1}
@@ -206,16 +211,16 @@ export default function TourForm() {
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="label">Fiyat Notu</label>
+              <label className="label">Price Note</label>
               <input
                 className="input"
-                placeholder="Örn: Çift kişilik oda bazında"
+                placeholder="e.g. Based on double occupancy"
                 value={form.price_note}
                 onChange={(e) => update('price_note', e.target.value)}
               />
             </div>
             <div>
-              <label className="label">Kontenjan</label>
+              <label className="label">Capacity</label>
               <input
                 type="number"
                 min={0}
@@ -227,16 +232,16 @@ export default function TourForm() {
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="label">Lokasyon</label>
+              <label className="label">Location</label>
               <input
                 className="input"
-                placeholder="Örn: Kapadokya"
+                placeholder="e.g. Pamukkale"
                 value={form.location}
                 onChange={(e) => update('location', e.target.value)}
               />
             </div>
             <div>
-              <label className="label">Başlangıç Tarihi</label>
+              <label className="label">Start Date</label>
               <input
                 type="date"
                 className="input"
@@ -248,36 +253,36 @@ export default function TourForm() {
         </div>
 
         <div className="card space-y-3 p-6">
-          <h2 className="font-semibold text-gray-800">Öne Çıkanlar (Tour Highlights)</h2>
-          <p className="text-xs text-gray-500">Her satıra bir yer/başlık yaz (örn: İstanbul).</p>
+          <h2 className="font-semibold text-gray-800">Highlights</h2>
+          <p className="text-xs text-gray-500">One item per line (e.g. Istanbul).</p>
           <textarea
             className="input"
             rows={4}
-            placeholder={'İstanbul\nKuşadası\nPamukkale'}
+            placeholder={'Istanbul\nKusadasi\nPamukkale'}
             value={listToText(form.highlights)}
             onChange={(e) => update('highlights', textToList(e.target.value))}
           />
         </div>
 
         <div className="card space-y-3 p-6">
-          <h2 className="font-semibold text-gray-800">Dahil / Hariç</h2>
+          <h2 className="font-semibold text-gray-800">Included / Excluded</h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="label">Dahil olanlar (her satıra bir madde)</label>
+              <label className="label">Included (one item per line)</label>
               <textarea
                 className="input"
                 rows={6}
-                placeholder={'Tur Rehberi\nİç Hat Uçuşları\nGiriş Ücretleri'}
+                placeholder={'Tour Guide\nDomestic Flights\nEntrance Fees'}
                 value={listToText(form.included)}
                 onChange={(e) => update('included', textToList(e.target.value))}
               />
             </div>
             <div>
-              <label className="label">Hariç olanlar (her satıra bir madde)</label>
+              <label className="label">Excluded (one item per line)</label>
               <textarea
                 className="input"
                 rows={6}
-                placeholder={'Opsiyonel Turlar\nAkşam Yemekleri\nBahşişler'}
+                placeholder={'Optional Tours\nDinners\nTips'}
                 value={listToText(form.excluded)}
                 onChange={(e) => update('excluded', textToList(e.target.value))}
               />
@@ -286,20 +291,17 @@ export default function TourForm() {
         </div>
 
         <div className="card space-y-3 p-6">
-          <h2 className="font-semibold text-gray-800">Görseller</h2>
+          <h2 className="font-semibold text-gray-800">Images</h2>
           <ImageUploader images={form.images} onChange={(imgs) => update('images', imgs)} />
         </div>
 
         <div className="card space-y-3 p-6">
-          <h2 className="font-semibold text-gray-800">Gün Gün Program</h2>
-          <ItineraryEditor
-            days={form.itinerary}
-            onChange={(days) => update('itinerary', days)}
-          />
+          <h2 className="font-semibold text-gray-800">Itinerary</h2>
+          <ItineraryEditor days={form.itinerary} onChange={(days) => update('itinerary', days)} />
         </div>
 
         <div className="card space-y-3 p-6">
-          <h2 className="font-semibold text-gray-800">Tur Rotası (Harita)</h2>
+          <h2 className="font-semibold text-gray-800">Route (Map)</h2>
           <RouteEditor points={form.route} onChange={(pts) => update('route', pts)} />
         </div>
 
@@ -312,7 +314,7 @@ export default function TourForm() {
             className="btn-secondary"
             disabled={saving}
           >
-            Taslak Olarak Kaydet
+            Save as Draft
           </button>
           <button
             type="button"
@@ -320,7 +322,7 @@ export default function TourForm() {
             className="btn-primary"
             disabled={saving}
           >
-            {saving ? 'Kaydediliyor...' : 'Yayınla'}
+            {saving ? 'Saving...' : 'Publish'}
           </button>
         </div>
       </form>

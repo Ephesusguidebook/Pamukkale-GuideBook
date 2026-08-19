@@ -22,7 +22,7 @@ export default function Settings() {
     api
       .get('/settings')
       .then((res) => setForm({ ...empty, ...res.data }))
-      .catch(() => setError('Ayarlar yüklenemedi.'))
+      .catch(() => setError('Could not load settings.'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -39,29 +39,27 @@ export default function Settings() {
       await api.put('/settings', form);
       setSaved(true);
     } catch {
-      setError('Kaydedilemedi.');
+      setError('Could not save.');
     } finally {
       setSaving(false);
     }
   }
 
-  // Danışman fotoğrafını tekli görsel olarak yüklemek için ImageUploader'ı
-  // (çoklu görsel bekleyen) tek elemanlı bir diziyle kullanıyoruz.
+  // Reuse the (multi-image) uploader for a single consultant photo.
   const photoAsList = form.consultant_photo ? [{ url: form.consultant_photo }] : [];
 
-  if (loading) return <p className="text-gray-500">Yükleniyor...</p>;
+  if (loading) return <p className="text-gray-500">Loading...</p>;
 
   return (
     <div className="max-w-2xl">
-      <h1 className="mb-6 text-2xl font-bold text-gray-900">Ayarlar</h1>
+      <h1 className="mb-6 text-2xl font-bold text-gray-900">Settings</h1>
       <form onSubmit={handleSubmit} className="card space-y-4 p-6">
-        <h2 className="font-semibold text-gray-800">Seyahat Danışmanı Kartı</h2>
+        <h2 className="font-semibold text-gray-800">Travel Consultant Card</h2>
         <p className="text-xs text-gray-500">
-          Bu bilgiler tüm tur detay sayfalarındaki "Travel Consultant" kartında
-          gösterilir.
+          This information is shown in the "Travel Consultant" card on every tour detail page.
         </p>
         <div>
-          <label className="label">Fotoğraf</label>
+          <label className="label">Photo</label>
           <ImageUploader
             images={photoAsList}
             onChange={(imgs) => update('consultant_photo', imgs[0]?.url || '')}
@@ -69,7 +67,7 @@ export default function Settings() {
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="label">Ad Soyad</label>
+            <label className="label">Full Name</label>
             <input
               className="input"
               value={form.consultant_name}
@@ -77,16 +75,16 @@ export default function Settings() {
             />
           </div>
           <div>
-            <label className="label">Ünvan</label>
+            <label className="label">Title</label>
             <input
               className="input"
-              placeholder="Örn: Seyahat Danışmanı"
+              placeholder="e.g. Travel Consultant"
               value={form.consultant_title}
               onChange={(e) => update('consultant_title', e.target.value)}
             />
           </div>
           <div>
-            <label className="label">Telefon</label>
+            <label className="label">Phone</label>
             <input
               className="input"
               placeholder="+90 5xx xxx xx xx"
@@ -95,16 +93,16 @@ export default function Settings() {
             />
           </div>
           <div>
-            <label className="label">WhatsApp Numarası</label>
+            <label className="label">WhatsApp Number</label>
             <input
               className="input"
-              placeholder="905xxxxxxxxx (başında + veya boşluk olmadan)"
+              placeholder="905xxxxxxxxx (no + or spaces)"
               value={form.consultant_whatsapp}
               onChange={(e) => update('consultant_whatsapp', e.target.value)}
             />
           </div>
           <div className="sm:col-span-2">
-            <label className="label">E-posta</label>
+            <label className="label">Email</label>
             <input
               type="email"
               className="input"
@@ -115,10 +113,10 @@ export default function Settings() {
         </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
-        {saved && <p className="text-sm text-teal-700">Kaydedildi.</p>}
+        {saved && <p className="text-sm text-teal-700">Saved.</p>}
 
         <button type="submit" className="btn-primary" disabled={saving}>
-          {saving ? 'Kaydediliyor...' : 'Kaydet'}
+          {saving ? 'Saving...' : 'Save'}
         </button>
       </form>
     </div>
