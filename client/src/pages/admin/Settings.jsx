@@ -11,6 +11,11 @@ const empty = {
   consultant_photo: '',
   whatsapp_button_phone: '',
   notification_email: '',
+  contact_email: '',
+  contact_phone: '',
+  contact_address: '',
+  facebook_url: '',
+  instagram_url: '',
 };
 
 export default function Settings() {
@@ -118,7 +123,8 @@ export default function Settings() {
           <h2 className="font-semibold text-gray-800">WhatsApp Button</h2>
           <p className="mt-1 text-xs text-gray-500">
             A floating WhatsApp button appears on every page of the site once you set a phone
-            number here. Leave empty to hide the button.
+            number here. This same number is also used for the WhatsApp icon on the Contact
+            page and footer. Leave empty to hide it everywhere.
           </p>
           <div className="mt-3">
             <label className="label">WhatsApp Number</label>
@@ -128,6 +134,71 @@ export default function Settings() {
               value={form.whatsapp_button_phone}
               onChange={(e) => update('whatsapp_button_phone', e.target.value)}
             />
+          </div>
+        </div>
+
+        <div className="border-t border-gray-100 pt-4">
+          <h2 className="font-semibold text-gray-800">Contact Page Info</h2>
+          <p className="mt-1 text-xs text-gray-500">
+            Shown at the top of the Contact page. Leave any field empty to hide it.
+          </p>
+          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="label">Contact Email</label>
+              <input
+                type="email"
+                className="input"
+                placeholder="info@example.com"
+                value={form.contact_email}
+                onChange={(e) => update('contact_email', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="label">Contact Phone</label>
+              <input
+                className="input"
+                placeholder="+90 5xx xxx xx xx"
+                value={form.contact_phone}
+                onChange={(e) => update('contact_phone', e.target.value)}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="label">Address</label>
+              <input
+                className="input"
+                placeholder="Street, City, Country"
+                value={form.contact_address}
+                onChange={(e) => update('contact_address', e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t border-gray-100 pt-4">
+          <h2 className="font-semibold text-gray-800">Social Links</h2>
+          <p className="mt-1 text-xs text-gray-500">
+            Shown as icon buttons on the Contact page and in the site footer. Leave a field
+            empty to hide that icon.
+          </p>
+          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="label">Facebook URL</label>
+              <input
+                className="input"
+                placeholder="https://facebook.com/yourpage"
+                value={form.facebook_url}
+                onChange={(e) => update('facebook_url', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="label">Instagram URL</label>
+              <input
+                className="input"
+                placeholder="https://instagram.com/yourpage"
+                value={form.instagram_url}
+                onChange={(e) => update('instagram_url', e.target.value)}
+              />
+            </div>
           </div>
         </div>
 

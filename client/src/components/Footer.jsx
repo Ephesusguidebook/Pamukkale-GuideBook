@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { CATEGORY_LIST } from '../lib/categories';
+import SocialLinks from './SocialLinks';
 
 export default function Footer() {
   return (
@@ -53,6 +54,7 @@ export default function Footer() {
         </div>
         <div className="mt-8 flex flex-col items-center justify-between gap-4 border-t border-gray-100 pt-6 sm:flex-row">
           <p>© {new Date().getFullYear()} TurRota. All rights reserved.</p>
+          <SocialLinks />
           <a href="/admin/login" className="text-gray-400 hover:text-teal-700">
             Admin Login
           </a>

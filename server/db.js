@@ -25,6 +25,11 @@ function emptyState() {
       consultant_photo: '',
       whatsapp_button_phone: '',
       notification_email: '',
+      contact_email: '',
+      contact_phone: '',
+      contact_address: '',
+      facebook_url: '',
+      instagram_url: '',
     },
     pageContent: {},
     counters: {
@@ -391,6 +396,11 @@ const settings = {
       consultant_photo: input.consultant_photo || '',
       whatsapp_button_phone: input.whatsapp_button_phone || '',
       notification_email: input.notification_email || '',
+      contact_email: input.contact_email || '',
+      contact_phone: input.contact_phone || '',
+      contact_address: input.contact_address || '',
+      facebook_url: input.facebook_url || '',
+      instagram_url: input.instagram_url || '',
     };
     persist();
     return state.settings;
