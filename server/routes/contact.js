@@ -10,30 +10,17 @@ router.post('/', (req, res) => {
   if (!b.name || !b.email) {
     return res.status(400).json({ error: 'İsim ve e-posta zorunlu.' });
   }
-  db.prepare(
-    `INSERT INTO contact_messages (tour_id, name, email, phone, message)
-     VALUES (?, ?, ?, ?, ?)`
-  ).run(b.tour_id || null, b.name, b.email, b.phone || '', b.message || '');
+  db.contactMessages.create(b);
   res.status(201).json({ ok: true });
 });
 
 // GET /api/admin/contact - admin için mesaj listesi
 router.get('/admin/list', requireAdmin, (req, res) => {
-  const rows = db
-    .prepare(
-      `SELECT cm.*, t.title AS tour_title
-       FROM contact_messages cm
-       LEFT JOIN tours t ON t.id = cm.tour_id
-       ORDER BY cm.created_at DESC`
-    )
-    .all();
-  res.json(rows);
+  res.json(db.contactMessages.listWithTourTitle());
 });
 
 router.put('/admin/:id/read', requireAdmin, (req, res) => {
-  db.prepare("UPDATE contact_messages SET status = 'read' WHERE id = ?").run(
-    req.params.id
-  );
+  db.contactMessages.markRead(req.params.id);
   res.json({ ok: true });
 });
 

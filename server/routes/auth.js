@@ -11,9 +11,7 @@ router.post('/login', (req, res) => {
   if (!email || !password) {
     return res.status(400).json({ error: 'E-posta ve şifre zorunlu.' });
   }
-  const user = db
-    .prepare('SELECT * FROM admin_users WHERE email = ?')
-    .get(String(email).toLowerCase().trim());
+  const user = db.adminUsers.findByEmail(email);
 
   if (!user || !bcrypt.compareSync(password, user.password_hash)) {
     return res.status(401).json({ error: 'E-posta veya şifre hatalı.' });
