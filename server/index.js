@@ -26,8 +26,9 @@ app.use('/api/contact', contactRouter);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
-// Üretimde React build'ini sun (client/dist)
-const clientDist = path.join(__dirname, '..', 'client', 'dist');
+// Üretimde React build'ini sun (server/public — Hostinger gibi platformlarda
+// "kök dizin" sadece server/ olabildiği için build çıktısını server içine koyuyoruz)
+const clientDist = path.join(__dirname, 'public');
 if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
   app.get('*', (req, res, next) => {
