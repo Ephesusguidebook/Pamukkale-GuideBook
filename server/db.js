@@ -13,18 +13,39 @@ function emptyState() {
     adminUsers: [],
     tours: [],
     contactMessages: [],
-    counters: { adminUsers: 0, tours: 0, contactMessages: 0, images: 0, itinerary: 0 },
+    settings: {
+      consultant_name: '',
+      consultant_title: '',
+      consultant_phone: '',
+      consultant_whatsapp: '',
+      consultant_email: '',
+      consultant_photo: '',
+    },
+    counters: {
+      adminUsers: 0,
+      tours: 0,
+      contactMessages: 0,
+      images: 0,
+      itinerary: 0,
+      routePoints: 0,
+    },
   };
 }
 
 function load() {
-  if (!fs.existsSync(DATA_FILE)) return emptyState();
+  const base = emptyState();
+  if (!fs.existsSync(DATA_FILE)) return base;
   try {
     const raw = fs.readFileSync(DATA_FILE, 'utf-8');
     const parsed = JSON.parse(raw);
-    return { ...emptyState(), ...parsed };
+    return {
+      ...base,
+      ...parsed,
+      settings: { ...base.settings, ...(parsed.settings || {}) },
+      counters: { ...base.counters, ...(parsed.counters || {}) },
+    };
   } catch {
-    return emptyState();
+    return base;
   }
 }
 
@@ -75,11 +96,14 @@ ensureAdminUser();
 
 // --- Turlar ---
 function normalizeTourInput(input) {
+  const originalPrice = Number(input.original_price) || 0;
   return {
     title: input.title,
     summary: input.summary || '',
     description: input.description || '',
     price: Number(input.price) || 0,
+    original_price: originalPrice,
+    price_note: input.price_note || '',
     currency: input.currency || 'TRY',
     duration_days: Number(input.duration_days) || 1,
     location: input.location || '',
@@ -87,7 +111,25 @@ function normalizeTourInput(input) {
     capacity: Number(input.capacity) || 0,
     status: input.status === 'draft' ? 'draft' : 'published',
     cover_image: input.cover_image || '',
+    languages: normalizeStringList(input.languages),
+    highlights: normalizeStringList(input.highlights),
+    included: normalizeStringList(input.included),
+    excluded: normalizeStringList(input.excluded),
   };
+}
+
+// Hem dizi hem satır satır metin girişini kabul eder ("A\nB\nC" -> ["A","B","C"]).
+function normalizeStringList(value) {
+  if (Array.isArray(value)) {
+    return value.map((v) => String(v).trim()).filter(Boolean);
+  }
+  if (typeof value === 'string') {
+    return value
+      .split('\n')
+      .map((v) => v.trim())
+      .filter(Boolean);
+  }
+  return [];
 }
 
 function normalizeImages(images) {
@@ -108,6 +150,18 @@ function normalizeItinerary(itinerary) {
     details: day.details || '',
     sort_order: idx,
   }));
+}
+
+function normalizeRoute(route) {
+  return (route || [])
+    .map((point, idx) => ({
+      id: nextId('routePoints'),
+      name: point.name || '',
+      lat: Number(point.lat),
+      lng: Number(point.lng),
+      sort_order: idx,
+    }))
+    .filter((p) => p.name && Number.isFinite(p.lat) && Number.isFinite(p.lng));
 }
 
 const tours = {
@@ -135,6 +189,7 @@ const tours = {
       ...normalizeTourInput(input),
       images: normalizeImages(input.images),
       itinerary: normalizeItinerary(input.itinerary),
+      route: normalizeRoute(input.route),
       created_at: nowIso(),
       updated_at: nowIso(),
     };
@@ -152,6 +207,7 @@ const tours = {
       ...normalizeTourInput(input),
       images: normalizeImages(input.images),
       itinerary: normalizeItinerary(input.itinerary),
+      route: normalizeRoute(input.route),
       updated_at: nowIso(),
     };
     state.tours[idx] = updated;
@@ -201,4 +257,23 @@ const contactMessages = {
   },
 };
 
-module.exports = { adminUsers, tours, contactMessages };
+// --- Site ayarları (Travel Consultant bilgisi vb.) ---
+const settings = {
+  get() {
+    return state.settings;
+  },
+  update(input) {
+    state.settings = {
+      consultant_name: input.consultant_name || '',
+      consultant_title: input.consultant_title || '',
+      consultant_phone: input.consultant_phone || '',
+      consultant_whatsapp: input.consultant_whatsapp || '',
+      consultant_email: input.consultant_email || '',
+      consultant_photo: input.consultant_photo || '',
+    };
+    persist();
+    return state.settings;
+  },
+};
+
+module.exports = { adminUsers, tours, contactMessages, settings };

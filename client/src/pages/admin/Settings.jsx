@@ -1,0 +1,126 @@
+import { useEffect, useState } from 'react';
+import api from '../../api';
+import ImageUploader from '../../components/ImageUploader';
+
+const empty = {
+  consultant_name: '',
+  consultant_title: '',
+  consultant_phone: '',
+  consultant_whatsapp: '',
+  consultant_email: '',
+  consultant_photo: '',
+};
+
+export default function Settings() {
+  const [form, setForm] = useState(empty);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    api
+      .get('/settings')
+      .then((res) => setForm({ ...empty, ...res.data }))
+      .catch(() => setError('Ayarlar yüklenemedi.'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  function update(field, value) {
+    setForm((f) => ({ ...f, [field]: value }));
+    setSaved(false);
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      await api.put('/settings', form);
+      setSaved(true);
+    } catch {
+      setError('Kaydedilemedi.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Danışman fotoğrafını tekli görsel olarak yüklemek için ImageUploader'ı
+  // (çoklu görsel bekleyen) tek elemanlı bir diziyle kullanıyoruz.
+  const photoAsList = form.consultant_photo ? [{ url: form.consultant_photo }] : [];
+
+  if (loading) return <p className="text-gray-500">Yükleniyor...</p>;
+
+  return (
+    <div className="max-w-2xl">
+      <h1 className="mb-6 text-2xl font-bold text-gray-900">Ayarlar</h1>
+      <form onSubmit={handleSubmit} className="card space-y-4 p-6">
+        <h2 className="font-semibold text-gray-800">Seyahat Danışmanı Kartı</h2>
+        <p className="text-xs text-gray-500">
+          Bu bilgiler tüm tur detay sayfalarındaki "Travel Consultant" kartında
+          gösterilir.
+        </p>
+        <div>
+          <label className="label">Fotoğraf</label>
+          <ImageUploader
+            images={photoAsList}
+            onChange={(imgs) => update('consultant_photo', imgs[0]?.url || '')}
+          />
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className="label">Ad Soyad</label>
+            <input
+              className="input"
+              value={form.consultant_name}
+              onChange={(e) => update('consultant_name', e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="label">Ünvan</label>
+            <input
+              className="input"
+              placeholder="Örn: Seyahat Danışmanı"
+              value={form.consultant_title}
+              onChange={(e) => update('consultant_title', e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="label">Telefon</label>
+            <input
+              className="input"
+              placeholder="+90 5xx xxx xx xx"
+              value={form.consultant_phone}
+              onChange={(e) => update('consultant_phone', e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="label">WhatsApp Numarası</label>
+            <input
+              className="input"
+              placeholder="905xxxxxxxxx (başında + veya boşluk olmadan)"
+              value={form.consultant_whatsapp}
+              onChange={(e) => update('consultant_whatsapp', e.target.value)}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="label">E-posta</label>
+            <input
+              type="email"
+              className="input"
+              value={form.consultant_email}
+              onChange={(e) => update('consultant_email', e.target.value)}
+            />
+          </div>
+        </div>
+
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        {saved && <p className="text-sm text-teal-700">Kaydedildi.</p>}
+
+        <button type="submit" className="btn-primary" disabled={saving}>
+          {saving ? 'Kaydediliyor...' : 'Kaydet'}
+        </button>
+      </form>
+    </div>
+  );
+}

@@ -25,6 +25,9 @@ export default function AdminLayout() {
               <NavLink to="/admin/mesajlar" className={linkClass}>
                 Mesajlar
               </NavLink>
+              <NavLink to="/admin/ayarlar" className={linkClass}>
+                Ayarlar
+              </NavLink>
             </nav>
           </div>
           <div className="flex items-center gap-4">

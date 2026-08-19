@@ -15,6 +15,7 @@ import Login from './pages/admin/Login';
 import Dashboard from './pages/admin/Dashboard';
 import TourForm from './pages/admin/TourForm';
 import Messages from './pages/admin/Messages';
+import Settings from './pages/admin/Settings';
 
 function PublicLayout({ children }) {
   return (
@@ -47,6 +48,7 @@ export default function App() {
           <Route index element={<Dashboard />} />
           <Route path="turlar/:id" element={<TourForm />} />
           <Route path="mesajlar" element={<Messages />} />
+          <Route path="ayarlar" element={<Settings />} />
         </Route>
 
         <Route path="*" element={<PublicLayout><NotFound /></PublicLayout>} />

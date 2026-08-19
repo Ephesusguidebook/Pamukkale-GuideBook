@@ -8,6 +8,7 @@ const toursRouter = require('./routes/tours');
 const adminToursRouter = require('./routes/adminTours');
 const authRouter = require('./routes/auth');
 const contactRouter = require('./routes/contact');
+const settingsRouter = require('./routes/settings');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -23,6 +24,7 @@ app.use('/api/tours', toursRouter);
 app.use('/api/admin/tours', adminToursRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/contact', contactRouter);
+app.use('/api/settings', settingsRouter);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

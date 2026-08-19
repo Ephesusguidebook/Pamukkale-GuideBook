@@ -3,21 +3,40 @@ import { useNavigate, useParams } from 'react-router-dom';
 import api from '../../api';
 import ImageUploader from '../../components/ImageUploader';
 import ItineraryEditor from '../../components/ItineraryEditor';
+import RouteEditor from '../../components/RouteEditor';
 
 const emptyTour = {
   title: '',
   summary: '',
   description: '',
   price: '',
+  original_price: '',
+  price_note: '',
   currency: 'TRY',
   duration_days: 1,
   location: '',
   start_date: '',
   capacity: '',
   status: 'draft',
+  languages: [],
+  highlights: [],
+  included: [],
+  excluded: [],
   images: [],
   itinerary: [],
+  route: [],
 };
+
+// Diziyi satır satır metne çevirir ve tersini yapar (textarea alanları için).
+function listToText(list) {
+  return (list || []).join('\n');
+}
+function textToList(text) {
+  return text
+    .split('\n')
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
 
 export default function TourForm() {
   const { id } = useParams();
@@ -39,9 +58,15 @@ export default function TourForm() {
           ...emptyTour,
           ...t,
           price: t.price ?? '',
+          original_price: t.original_price || '',
           capacity: t.capacity ?? '',
           images: t.images || [],
           itinerary: t.itinerary || [],
+          route: t.route || [],
+          languages: t.languages || [],
+          highlights: t.highlights || [],
+          included: t.included || [],
+          excluded: t.excluded || [],
         });
       })
       .catch(() => setError('Tur bilgileri yüklenemedi.'))
@@ -109,12 +134,25 @@ export default function TourForm() {
             />
           </div>
           <div>
-            <label className="label">Detaylı Açıklama</label>
+            <label className="label">Detaylı Açıklama (Tour Overview)</label>
             <textarea
               className="input"
               rows={5}
               value={form.description}
               onChange={(e) => update('description', e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="label">Diller (virgülle ayır — örn: TR, EN, ES)</label>
+            <input
+              className="input"
+              value={form.languages.join(', ')}
+              onChange={(e) =>
+                update(
+                  'languages',
+                  e.target.value.split(',').map((v) => v.trim()).filter(Boolean)
+                )
+              }
             />
           </div>
         </div>
@@ -123,13 +161,24 @@ export default function TourForm() {
           <h2 className="font-semibold text-gray-800">Fiyat ve Kapasite</h2>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <div>
-              <label className="label">Fiyat</label>
+              <label className="label">Fiyat (indirimli/güncel)</label>
               <input
                 type="number"
                 min={0}
                 className="input"
                 value={form.price}
                 onChange={(e) => update('price', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="label">Eski Fiyat (opsiyonel)</label>
+              <input
+                type="number"
+                min={0}
+                className="input"
+                placeholder="İndirim göstermek için"
+                value={form.original_price}
+                onChange={(e) => update('original_price', e.target.value)}
               />
             </div>
             <div>
@@ -152,6 +201,17 @@ export default function TourForm() {
                 className="input"
                 value={form.duration_days}
                 onChange={(e) => update('duration_days', e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="label">Fiyat Notu</label>
+              <input
+                className="input"
+                placeholder="Örn: Çift kişilik oda bazında"
+                value={form.price_note}
+                onChange={(e) => update('price_note', e.target.value)}
               />
             </div>
             <div>
@@ -188,6 +248,44 @@ export default function TourForm() {
         </div>
 
         <div className="card space-y-3 p-6">
+          <h2 className="font-semibold text-gray-800">Öne Çıkanlar (Tour Highlights)</h2>
+          <p className="text-xs text-gray-500">Her satıra bir yer/başlık yaz (örn: İstanbul).</p>
+          <textarea
+            className="input"
+            rows={4}
+            placeholder={'İstanbul\nKuşadası\nPamukkale'}
+            value={listToText(form.highlights)}
+            onChange={(e) => update('highlights', textToList(e.target.value))}
+          />
+        </div>
+
+        <div className="card space-y-3 p-6">
+          <h2 className="font-semibold text-gray-800">Dahil / Hariç</h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="label">Dahil olanlar (her satıra bir madde)</label>
+              <textarea
+                className="input"
+                rows={6}
+                placeholder={'Tur Rehberi\nİç Hat Uçuşları\nGiriş Ücretleri'}
+                value={listToText(form.included)}
+                onChange={(e) => update('included', textToList(e.target.value))}
+              />
+            </div>
+            <div>
+              <label className="label">Hariç olanlar (her satıra bir madde)</label>
+              <textarea
+                className="input"
+                rows={6}
+                placeholder={'Opsiyonel Turlar\nAkşam Yemekleri\nBahşişler'}
+                value={listToText(form.excluded)}
+                onChange={(e) => update('excluded', textToList(e.target.value))}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="card space-y-3 p-6">
           <h2 className="font-semibold text-gray-800">Görseller</h2>
           <ImageUploader images={form.images} onChange={(imgs) => update('images', imgs)} />
         </div>
@@ -198,6 +296,11 @@ export default function TourForm() {
             days={form.itinerary}
             onChange={(days) => update('itinerary', days)}
           />
+        </div>
+
+        <div className="card space-y-3 p-6">
+          <h2 className="font-semibold text-gray-800">Tur Rotası (Harita)</h2>
+          <RouteEditor points={form.route} onChange={(pts) => update('route', pts)} />
         </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
