@@ -3,6 +3,7 @@ import { AdminAuthProvider } from './AdminAuthContext';
 import { PageContentProvider } from './PageContentContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
+import WhatsAppButton from './components/WhatsAppButton';
 import AdminLayout from './components/AdminLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import { CATEGORIES } from './lib/categories';
@@ -16,6 +17,7 @@ import AboutUs from './pages/AboutUs';
 import Contact from './pages/Contact';
 import Terms from './pages/Terms';
 import PrivacyPolicy from './pages/PrivacyPolicy';
+import Faq from './pages/Faq';
 import NotFound from './pages/NotFound';
 
 import Login from './pages/admin/Login';
@@ -34,6 +36,7 @@ function PublicLayout({ children }) {
       <Navbar />
       <main className="flex-1">{children}</main>
       <Footer />
+      <WhatsAppButton />
     </div>
   );
 }
@@ -79,6 +82,7 @@ export default function App() {
         <Route path="/contact" element={<PublicLayout><Contact /></PublicLayout>} />
         <Route path="/terms-and-conditions" element={<PublicLayout><Terms /></PublicLayout>} />
         <Route path="/privacy-policy" element={<PublicLayout><PrivacyPolicy /></PublicLayout>} />
+        <Route path="/faq" element={<PublicLayout><Faq /></PublicLayout>} />
 
         <Route path="/admin/login" element={<Login />} />
         <Route

@@ -11,6 +11,7 @@ const PAGES = [
   { key: 'contact', label: 'Contact' },
   { key: 'terms', label: 'Terms and Conditions' },
   { key: 'privacy', label: 'Privacy Policy' },
+  { key: 'faq', label: 'FAQ' },
 ];
 
 export default function PageContent() {

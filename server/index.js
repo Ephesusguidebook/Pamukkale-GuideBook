@@ -18,6 +18,7 @@ const contactRouter = require('./routes/contact');
 const settingsRouter = require('./routes/settings');
 const pageContentRouter = require('./routes/pageContent');
 const adminPageContentRouter = require('./routes/adminPageContent');
+const sitemapRouter = require('./routes/sitemap');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -45,6 +46,9 @@ app.use('/api/page-content', pageContentRouter);
 app.use('/api/admin/page-content', adminPageContentRouter);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
+
+// SEO: sitemap.xml regenerated on every request from published content.
+app.use('/sitemap.xml', sitemapRouter);
 
 // Serve the React build in production (server/public — on hosts like
 // Hostinger where the "root directory" can only be server/, we put the

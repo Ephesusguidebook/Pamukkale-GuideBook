@@ -30,6 +30,9 @@ export default function Footer() {
               <li>
                 <Link to="/contact" className="hover:text-teal-700">Contact</Link>
               </li>
+              <li>
+                <Link to="/faq" className="hover:text-teal-700">FAQ</Link>
+              </li>
             </ul>
           </div>
           <div>

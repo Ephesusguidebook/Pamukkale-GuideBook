@@ -23,6 +23,8 @@ function emptyState() {
       consultant_whatsapp: '',
       consultant_email: '',
       consultant_photo: '',
+      whatsapp_button_phone: '',
+      notification_email: '',
     },
     pageContent: {},
     counters: {
@@ -346,7 +348,12 @@ const contactMessages = {
     };
     state.contactMessages.push(msg);
     persist();
-    return msg;
+    let item_title = null;
+    if (msg.item_id && msg.item_type && ITEM_COLLECTIONS[msg.item_type]) {
+      const item = ITEM_COLLECTIONS[msg.item_type]().getById(msg.item_id);
+      item_title = item ? item.title : null;
+    }
+    return { ...msg, item_title };
   },
   listWithItemTitle() {
     return [...state.contactMessages]
@@ -382,6 +389,8 @@ const settings = {
       consultant_whatsapp: input.consultant_whatsapp || '',
       consultant_email: input.consultant_email || '',
       consultant_photo: input.consultant_photo || '',
+      whatsapp_button_phone: input.whatsapp_button_phone || '',
+      notification_email: input.notification_email || '',
     };
     persist();
     return state.settings;
@@ -427,6 +436,10 @@ const PAGE_CONTENT_DEFAULTS = {
   privacy: {
     h1: 'Privacy Policy',
     p: 'How we collect, use and protect the information you share with us.',
+  },
+  faq: {
+    h1: 'Frequently Asked Questions',
+    p: "Answers to the questions we hear most often. Can't find what you're looking for? Reach out through our contact page.",
   },
 };
 

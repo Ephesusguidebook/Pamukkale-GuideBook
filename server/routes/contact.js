@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { requireAdmin } = require('../middleware/auth');
+const { sendContactNotification } = require('../lib/mailer');
 
 const router = express.Router();
 
@@ -10,8 +11,14 @@ router.post('/', (req, res) => {
   if (!b.name || !b.email) {
     return res.status(400).json({ error: 'Name and email are required.' });
   }
-  db.contactMessages.create(b);
+  const message = db.contactMessages.create(b);
   res.status(201).json({ ok: true });
+
+  // Fire-and-forget: never let email delivery delay or break the response.
+  const notifyEmail = db.settings.get().notification_email;
+  if (notifyEmail) {
+    sendContactNotification(notifyEmail, message);
+  }
 });
 
 // GET /api/contact/admin/list - admin message list

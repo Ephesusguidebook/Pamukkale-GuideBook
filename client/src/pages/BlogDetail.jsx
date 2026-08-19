@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import api from '../api';
+import useJsonLd from '../lib/useJsonLd';
 
 function formatDate(iso) {
   try {
@@ -39,6 +40,21 @@ export default function BlogDetail() {
       active = false;
     };
   }, [slug]);
+
+  useJsonLd(
+    post
+      ? {
+          '@context': 'https://schema.org',
+          '@type': 'BlogPosting',
+          headline: post.title,
+          description: post.excerpt || undefined,
+          image: post.cover_image || undefined,
+          author: post.author ? { '@type': 'Person', name: post.author } : undefined,
+          datePublished: post.created_at,
+          dateModified: post.updated_at || post.created_at,
+        }
+      : null
+  );
 
   if (loading) {
     return <div className="mx-auto max-w-3xl px-4 py-16 text-gray-500 sm:px-6">Loading...</div>;

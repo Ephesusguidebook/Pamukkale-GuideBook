@@ -4,6 +4,7 @@ import api from '../api';
 import ContactForm from '../components/ContactForm';
 import ConsultantCard from '../components/ConsultantCard';
 import RouteMap from '../components/RouteMap';
+import useJsonLd from '../lib/useJsonLd';
 
 function formatPrice(price, currency) {
   try {
@@ -47,6 +48,45 @@ export default function CategoryDetail({ category }) {
       active = false;
     };
   }, [slug, category.apiBase]);
+
+  // SEO structured data (schema.org TouristTrip) so search engines can show
+  // rich results (price, availability) for this listing.
+  useJsonLd(
+    item
+      ? {
+          '@context': 'https://schema.org',
+          '@type': 'TouristTrip',
+          name: item.title,
+          description: item.summary || item.description || undefined,
+          image:
+            item.images && item.images.length
+              ? item.images.map((img) => img.url)
+              : item.cover_image
+                ? [item.cover_image]
+                : undefined,
+          touristType: category.label,
+          itinerary:
+            item.itinerary && item.itinerary.length
+              ? item.itinerary.map((day) => ({
+                  '@type': 'Action',
+                  name: day.title || `Day ${day.day_number}`,
+                  description: day.details || undefined,
+                }))
+              : undefined,
+          offers: {
+            '@type': 'Offer',
+            price: item.price || undefined,
+            priceCurrency: item.currency || 'USD',
+            availability: 'https://schema.org/InStock',
+            url: typeof window !== 'undefined' ? window.location.href : undefined,
+          },
+          provider: {
+            '@type': 'TravelAgency',
+            name: 'TurRota',
+          },
+        }
+      : null
+  );
 
   if (loading) {
     return (

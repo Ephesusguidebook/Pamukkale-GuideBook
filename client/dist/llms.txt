@@ -1,0 +1,32 @@
+# Pamukkale GuideBook
+
+> A Turkey-based travel company offering Package Tours (multi-day), Daily
+> Tours (single-day), and standalone Activities, plus a travel blog.
+
+## Site Structure
+
+- /package-tours/ — multi-day, all-inclusive tour packages, listed with
+  price, duration, itinerary and included/excluded items. Each tour has its
+  own page at /package-tours/[slug]/.
+- /daily-tours/ — single-day guided tours. Each tour has its own page at
+  /daily-tours/[slug]/.
+- /activities/ — standalone activities and experiences (e.g. hot air
+  balloon rides, cooking classes). Each activity has its own page at
+  /activities/[slug]/.
+- /blog/ — travel tips and destination guides, with individual posts at
+  /blog/[slug]/.
+- /about-us/ — company information.
+- /contact/ — contact form for enquiries about any tour or activity.
+- /faq/ — frequently asked questions.
+- /terms-and-conditions/ and /privacy-policy/ — legal pages.
+
+## Content Freshness
+
+Package tours, daily tours, activities, blog posts and the headline/intro
+text on every page are managed by the site owner through a private admin
+panel (login required) and can change at any time — always prefer live data
+fetched from this site over cached or previously seen content.
+
+## Sitemap
+
+A machine-readable sitemap is available at /sitemap.xml.

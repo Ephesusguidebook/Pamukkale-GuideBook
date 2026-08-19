@@ -141,6 +141,37 @@ If you're using the "Node.js Web Application" option:
 > whatever was in the old "tours" list into Package Tours. Re-categorize any of those into
 > Daily Tours or Activities from the admin panel if needed.
 
+## Extra Features
+
+- **Page Content editor** (`/admin/page-content`): edit the H1 headline and intro paragraph
+  of every page without touching code.
+- **WhatsApp button**: set a phone number in `/admin/settings` under "WhatsApp Button" to
+  show a floating WhatsApp button on every page. Leave it empty to hide the button.
+- **Lead notification emails**: set a "Notification Email" in `/admin/settings` to get an
+  email whenever the contact form is submitted (in addition to it always appearing under
+  `/admin/messages`). Requires the `SMTP_*` variables in `.env` to be filled in — most
+  hosting providers (including Hostinger) give you an SMTP mailbox you can use here. If
+  `SMTP_HOST` is left blank, email notifications are simply skipped.
+- **SEO**: `/sitemap.xml` is generated on every request from whatever is currently
+  published (tours, activities, blog posts, static pages). `/llms.txt` describes the site
+  for AI crawlers. Package Tour / Daily Tour / Activity pages and Blog posts include
+  schema.org structured data (`TouristTrip` / `BlogPosting`) for richer search results.
+- **FAQ page** (`/faq/`) is included and listed under the "Company" menu alongside About
+  Us, Terms and Conditions, and Privacy Policy.
+
+## Demo Content
+
+`server/scripts/seed.js` publishes 6 Package Tours, 6 Daily Tours, 6 Activities and 6 Blog
+posts with realistic placeholder text and photos, so you can see the full site design
+populated. Run it against your own deployment:
+
+```bash
+SITE_URL=https://pamukkaleguidebook.com ADMIN_EMAIL=you@example.com ADMIN_PASSWORD=yourpassword \
+  node server/scripts/seed.js
+```
+
+Titles end with "(demo)" so they're easy to find and delete later from the admin panel.
+
 ## What's Next
 
 - Add a payment/booking flow when you're ready (you'll need to pick a payment provider —
