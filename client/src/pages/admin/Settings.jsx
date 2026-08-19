@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../../api';
-import ImageUploader from '../../components/ImageUploader';
+import MediaField from '../../components/MediaField';
 
 const empty = {
   consultant_name: '',
@@ -67,8 +67,9 @@ export default function Settings() {
         </p>
         <div>
           <label className="label">Photo</label>
-          <ImageUploader
+          <MediaField
             images={photoAsList}
+            multiple={false}
             onChange={(imgs) => update('consultant_photo', imgs[0]?.url || '')}
           />
         </div>

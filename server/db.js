@@ -16,6 +16,8 @@ function emptyState() {
     activities: [],
     blogPosts: [],
     contactMessages: [],
+    mediaFolders: [],
+    mediaItems: [],
     settings: {
       consultant_name: '',
       consultant_title: '',
@@ -42,6 +44,8 @@ function emptyState() {
       images: 0,
       itinerary: 0,
       routePoints: 0,
+      mediaFolders: 0,
+      mediaItems: 0,
     },
   };
 }
@@ -381,6 +385,79 @@ const contactMessages = {
   },
 };
 
+// --- Media Library (folders + items) ---
+// Every uploaded photo lives here first; galleries/sliders on tours,
+// activities and blog posts reference items from this shared library
+// instead of uploading ad hoc per form.
+const mediaFolders = {
+  listAll() {
+    return [...state.mediaFolders].sort((a, b) => a.name.localeCompare(b.name));
+  },
+  getById(id) {
+    return state.mediaFolders.find((f) => f.id === Number(id)) || null;
+  },
+  create(input) {
+    const folder = {
+      id: nextId('mediaFolders'),
+      name: String(input.name).trim(),
+      parent_id: input.parent_id ? Number(input.parent_id) : null,
+      created_at: nowIso(),
+    };
+    state.mediaFolders.push(folder);
+    persist();
+    return folder;
+  },
+  remove(id) {
+    const numId = Number(id);
+    const hasSubfolders = state.mediaFolders.some((f) => f.parent_id === numId);
+    const hasItems = state.mediaItems.some((i) => i.folder_id === numId);
+    if (hasSubfolders || hasItems) return false;
+    const idx = state.mediaFolders.findIndex((f) => f.id === numId);
+    if (idx === -1) return false;
+    state.mediaFolders.splice(idx, 1);
+    persist();
+    return true;
+  },
+};
+
+const mediaItems = {
+  listByFolder(folderId) {
+    const target = folderId || null;
+    return [...state.mediaItems]
+      .filter((i) => (i.folder_id || null) === target)
+      .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+  },
+  listAll() {
+    return [...state.mediaItems].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+  },
+  getById(id) {
+    return state.mediaItems.find((i) => i.id === Number(id)) || null;
+  },
+  create(input) {
+    const item = {
+      id: nextId('mediaItems'),
+      url: input.url,
+      filename: input.filename,
+      original_name: input.original_name || '',
+      folder_id: input.folder_id ? Number(input.folder_id) : null,
+      size: input.size || 0,
+      width: input.width || null,
+      height: input.height || null,
+      created_at: nowIso(),
+    };
+    state.mediaItems.push(item);
+    persist();
+    return item;
+  },
+  remove(id) {
+    const idx = state.mediaItems.findIndex((i) => i.id === Number(id));
+    if (idx === -1) return false;
+    state.mediaItems.splice(idx, 1);
+    persist();
+    return true;
+  },
+};
+
 // --- Site settings (Travel Consultant card, etc.) ---
 const settings = {
   get() {
@@ -484,6 +561,8 @@ module.exports = {
   activities,
   blogPosts,
   contactMessages,
+  mediaFolders,
+  mediaItems,
   settings,
   pageContent,
 };

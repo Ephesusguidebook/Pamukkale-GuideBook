@@ -31,6 +31,9 @@ export default function AdminLayout() {
               <NavLink to="/admin/messages" className={linkClass}>
                 Messages
               </NavLink>
+              <NavLink to="/admin/media" className={linkClass}>
+                Media
+              </NavLink>
               <NavLink to="/admin/page-content" className={linkClass}>
                 Page Content
               </NavLink>

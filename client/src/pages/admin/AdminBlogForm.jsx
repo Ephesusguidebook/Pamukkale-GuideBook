@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../../api';
-import ImageUploader from '../../components/ImageUploader';
+import MediaField from '../../components/MediaField';
 
 const emptyPost = {
   title: '',
@@ -111,8 +111,9 @@ export default function AdminBlogForm() {
 
         <div className="card space-y-3 p-6">
           <h2 className="font-semibold text-gray-800">Cover Image</h2>
-          <ImageUploader
+          <MediaField
             images={coverAsList}
+            multiple={false}
             onChange={(imgs) => update('cover_image', imgs[0]?.url || '')}
           />
         </div>

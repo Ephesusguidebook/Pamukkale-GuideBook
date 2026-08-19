@@ -29,6 +29,7 @@ import AdminBlogForm from './pages/admin/AdminBlogForm';
 import Messages from './pages/admin/Messages';
 import Settings from './pages/admin/Settings';
 import PageContent from './pages/admin/PageContent';
+import AdminMedia from './pages/admin/AdminMedia';
 
 function PublicLayout({ children }) {
   return (
@@ -126,6 +127,7 @@ export default function App() {
           <Route path="blog/:id" element={<AdminBlogForm />} />
 
           <Route path="messages" element={<Messages />} />
+          <Route path="media" element={<AdminMedia />} />
           <Route path="settings" element={<Settings />} />
           <Route path="page-content" element={<PageContent />} />
         </Route>

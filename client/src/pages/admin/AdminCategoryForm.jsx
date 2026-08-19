@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../../api';
-import ImageUploader from '../../components/ImageUploader';
+import MediaField from '../../components/MediaField';
 import ItineraryEditor from '../../components/ItineraryEditor';
 import RouteEditor from '../../components/RouteEditor';
 
@@ -292,7 +292,11 @@ export default function AdminCategoryForm({ category }) {
 
         <div className="card space-y-3 p-6">
           <h2 className="font-semibold text-gray-800">Images</h2>
-          <ImageUploader images={form.images} onChange={(imgs) => update('images', imgs)} />
+          <p className="text-xs text-gray-500">
+            Chosen from the Media Library — upload photos there first if you don't see what
+            you need.
+          </p>
+          <MediaField images={form.images} onChange={(imgs) => update('images', imgs)} />
         </div>
 
         <div className="card space-y-3 p-6">
