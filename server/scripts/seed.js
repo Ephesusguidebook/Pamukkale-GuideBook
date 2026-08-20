@@ -1,7 +1,8 @@
 /**
  * Fills the site with realistic-looking demo content so you can see the
- * whole layout in action: 6 Package Tours, 6 Daily Tours, 6 Activities and
- * 6 Blog posts, all published, with placeholder photos.
+ * whole layout in action: 6 Package Tours, 6 Daily Tours and 6 Activities
+ * (all under /tours, tagged by type) plus 6 Blog posts, all published, with
+ * placeholder photos.
  *
  * Usage:
  *   SITE_URL=https://pamukkaleguidebook.com ADMIN_EMAIL=you@example.com ADMIN_PASSWORD=yourpassword \
@@ -144,6 +145,7 @@ const dailyTours = [
     summary: 'A full day at the travertines and the ancient spa city above them.',
     description: 'Spend a full day exploring the white travertine terraces of Pamukkale and the ruins of ancient Hierapolis, with a local guide.',
     price: 59, original_price: 0, currency: 'USD', duration_days: 1, location: 'Denizli',
+    departure_point: 'Denizli',
     highlights: ['Travertines', 'Hierapolis', 'Antique Pool (optional)'],
     included: ['Guide', 'Transport', 'Entrance fees'], excluded: ['Lunch', 'Antique Pool ticket'],
     images: [{ url: img('pamukkale-daily1') }],
@@ -153,6 +155,7 @@ const dailyTours = [
     summary: 'The best-preserved ancient city on the Aegean coast, in a day.',
     description: 'A guided day trip to Ephesus from Kusadasi, covering the Terrace Houses, Library of Celsus and the Great Theatre.',
     price: 49, original_price: 0, currency: 'USD', duration_days: 1, location: 'Kusadasi',
+    departure_point: 'Kusadasi',
     highlights: ['Library of Celsus', 'Great Theatre', 'Terrace Houses'],
     included: ['Guide', 'Transport', 'Entrance fees'], excluded: ['Lunch'],
     images: [{ url: img('ephesus-daily1') }],
@@ -189,6 +192,7 @@ const dailyTours = [
     summary: 'A boat trip around Bodrum\'s best swimming spots.',
     description: 'A relaxed day sailing around Bodrum\'s turquoise bays, with stops for swimming and a light lunch on board.',
     price: 45, original_price: 0, currency: 'USD', duration_days: 1, location: 'Bodrum',
+    departure_point: 'Bodrum',
     highlights: ['Boat trip', 'Swimming stops', 'Scenic bays'],
     included: ['Boat', 'Lunch on board'], excluded: ['Hotel transfer'],
     images: [{ url: img('bodrum1') }],
@@ -237,6 +241,7 @@ const activities = [
     summary: 'Tandem paraglide over the Blue Lagoon.',
     description: 'Tandem paragliding flight from Babadag mountain, landing on the beach at Oludeniz\'s famous Blue Lagoon.',
     price: 90, original_price: 0, currency: 'USD', duration_days: 1, location: 'Fethiye',
+    departure_point: 'Fethiye',
     highlights: ['Tandem flight', 'Certified pilot', 'Video package (optional)'],
     included: ['Equipment', 'Pilot', 'Hotel pickup'], excluded: ['Video package'],
     images: [{ url: img('paragliding1') }],
@@ -329,9 +334,13 @@ async function main() {
     }
   }
 
-  await createAll('package tours', '/api/admin/package-tours', packageTours);
-  await createAll('daily tours', '/api/admin/daily-tours', dailyTours);
-  await createAll('activities', '/api/admin/activities', activities);
+  const tours = [
+    ...packageTours.map((t) => ({ ...t, type: 'package' })),
+    ...dailyTours.map((t) => ({ ...t, type: 'daily' })),
+    ...activities.map((t) => ({ ...t, type: 'activity' })),
+  ];
+
+  await createAll('tours (package + daily + activities)', '/api/admin/tours', tours);
   await createAll('blog posts', '/api/admin/blog', blogPosts);
 
   console.log('\nDone! All demo content is published and live.');

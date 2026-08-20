@@ -4,12 +4,8 @@ const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
 
-const packageToursRouter = require('./routes/packageTours');
-const adminPackageToursRouter = require('./routes/adminPackageTours');
-const dailyToursRouter = require('./routes/dailyTours');
-const adminDailyToursRouter = require('./routes/adminDailyTours');
-const activitiesRouter = require('./routes/activities');
-const adminActivitiesRouter = require('./routes/adminActivities');
+const toursRouter = require('./routes/tours');
+const adminToursRouter = require('./routes/adminTours');
 const blogRouter = require('./routes/blog');
 const adminBlogRouter = require('./routes/adminBlog');
 const adminMediaRouter = require('./routes/adminMedia');
@@ -43,16 +39,13 @@ function isLoggablePath(pathname) {
   return !STATIC_ASSET_RE.test(pathname);
 }
 
-// Package Tour / Daily Tour / Activity / Blog detail pages, plus the fixed
-// static pages — used so a bot/visitor hitting a genuinely unknown or
-// deleted URL gets a real 404 status (both for accurate crawl-error
-// reporting and for SEO), instead of always answering 200 like a typical
-// bare SPA catch-all would.
+// Blog detail pages, plus the fixed static pages — used so a bot/visitor
+// hitting a genuinely unknown or deleted URL gets a real 404 status (both
+// for accurate crawl-error reporting and for SEO), instead of always
+// answering 200 like a typical bare SPA catch-all would.
 const STATIC_PAGE_PATHS = new Set([
   '/',
-  '/package-tours',
-  '/daily-tours',
-  '/activities',
+  '/tours',
   '/blog',
   '/about-us',
   '/contact',
@@ -60,18 +53,44 @@ const STATIC_PAGE_PATHS = new Set([
   '/privacy-policy',
   '/faq',
 ]);
-const DETAIL_PREFIXES = [
-  { prefix: '/package-tours/', collection: () => db.packageTours },
-  { prefix: '/daily-tours/', collection: () => db.dailyTours },
-  { prefix: '/activities/', collection: () => db.activities },
-  { prefix: '/blog/', collection: () => db.blogPosts },
-];
+const DETAIL_PREFIXES = [{ prefix: '/blog/', collection: () => db.blogPosts }];
+
+// /tours URL scheme: /tours, /tours/:type, /tours/from-:departure,
+// /tours/:type/from-:departure (combinable, either order), /tours/:slug —
+// classifies a single path segment as a type filter, a departure filter, or
+// (if neither) a candidate tour detail slug. Kept in sync with the
+// equivalent client-side logic in client/src/lib/tourRouting.js.
+const URL_SLUG_TO_TYPE = { package: 'package', daily: 'daily', activities: 'activity' };
+function classifyToursSegment(seg) {
+  if (URL_SLUG_TO_TYPE[seg]) return { kind: 'type', value: URL_SLUG_TO_TYPE[seg] };
+  if (seg.startsWith('from-') && seg.length > 5) return { kind: 'departure' };
+  return null;
+}
+function isKnownToursPath(segments) {
+  if (segments.length === 0) return true; // /tours itself
+  if (segments.length === 1) {
+    const cls = classifyToursSegment(segments[0]);
+    if (cls) return true; // a type/departure filter page is always "known", even if currently empty
+    return !!db.tours.getPublishedBySlug(segments[0]);
+  }
+  if (segments.length === 2) {
+    const c1 = classifyToursSegment(segments[0]);
+    const c2 = classifyToursSegment(segments[1]);
+    return !!c1 && !!c2 && c1.kind !== c2.kind;
+  }
+  return false;
+}
+
 function isKnownPath(pathname) {
   // The whole /admin panel is a legitimate (client-auth-gated) part of the
   // app, not public content to validate against — always 200 so a direct
   // load or hard refresh of any admin screen doesn't get a false 404.
   if (pathname === '/admin' || pathname.startsWith('/admin/')) return true;
   if (STATIC_PAGE_PATHS.has(pathname)) return true;
+  if (pathname === '/tours' || pathname.startsWith('/tours/')) {
+    const rest = pathname.slice('/tours'.length).replace(/^\/|\/$/g, '');
+    return isKnownToursPath(rest ? rest.split('/') : []);
+  }
   const match = DETAIL_PREFIXES.find((d) => pathname.startsWith(d.prefix));
   if (!match) return false;
   const slug = pathname.slice(match.prefix.length);
@@ -132,12 +151,8 @@ app.get('*', (req, res, next) => {
 });
 
 // API routes
-app.use('/api/package-tours', packageToursRouter);
-app.use('/api/admin/package-tours', adminPackageToursRouter);
-app.use('/api/daily-tours', dailyToursRouter);
-app.use('/api/admin/daily-tours', adminDailyToursRouter);
-app.use('/api/activities', activitiesRouter);
-app.use('/api/admin/activities', adminActivitiesRouter);
+app.use('/api/tours', toursRouter);
+app.use('/api/admin/tours', adminToursRouter);
 app.use('/api/blog', blogRouter);
 app.use('/api/admin/blog', adminBlogRouter);
 app.use('/api/admin/media', adminMediaRouter);

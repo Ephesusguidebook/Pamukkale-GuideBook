@@ -7,9 +7,10 @@ const SITE_URL = (process.env.SITE_URL || 'http://localhost:4000').replace(/\/$/
 
 const STATIC_PATHS = [
   '/',
-  '/package-tours/',
-  '/daily-tours/',
-  '/activities/',
+  '/tours/',
+  '/tours/package/',
+  '/tours/daily/',
+  '/tours/activities/',
   '/blog/',
   '/about-us/',
   '/contact/',
@@ -31,15 +32,12 @@ router.get('/', (req, res) => {
 
   STATIC_PATHS.forEach((p) => entries.push(urlEntry(`${SITE_URL}${p}`)));
 
-  db.packageTours
+  db.tours
+    .distinctDeparturePoints()
+    .forEach((d) => entries.push(urlEntry(`${SITE_URL}/tours/from-${d.slug}/`)));
+  db.tours
     .listPublished()
-    .forEach((t) => entries.push(urlEntry(`${SITE_URL}/package-tours/${t.slug}/`, t.updated_at)));
-  db.dailyTours
-    .listPublished()
-    .forEach((t) => entries.push(urlEntry(`${SITE_URL}/daily-tours/${t.slug}/`, t.updated_at)));
-  db.activities
-    .listPublished()
-    .forEach((t) => entries.push(urlEntry(`${SITE_URL}/activities/${t.slug}/`, t.updated_at)));
+    .forEach((t) => entries.push(urlEntry(`${SITE_URL}/tours/${t.slug}/`, t.updated_at)));
   db.blogPosts
     .listPublished()
     .forEach((p) => entries.push(urlEntry(`${SITE_URL}/blog/${p.slug}/`, p.updated_at)));

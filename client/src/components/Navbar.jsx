@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import { CATEGORIES } from '../lib/categories';
+import { TOUR_TYPES } from '../lib/tourRouting';
 import api from '../api';
 
 const navLink = ({ isActive }) =>
@@ -17,6 +17,7 @@ const COMPANY_LINKS = [
 
 export default function Navbar() {
   const [companyOpen, setCompanyOpen] = useState(false);
+  const [toursOpen, setToursOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [logo, setLogo] = useState('');
 
@@ -54,15 +55,28 @@ export default function Navbar() {
           <NavLink to="/" end className={navLink}>
             Home
           </NavLink>
-          <NavLink to={CATEGORIES.packageTours.publicPath} className={navLink}>
-            Package Tours
-          </NavLink>
-          <NavLink to={CATEGORIES.dailyTours.publicPath} className={navLink}>
-            Daily Tours
-          </NavLink>
-          <NavLink to={CATEGORIES.activities.publicPath} className={navLink}>
-            Activities
-          </NavLink>
+          <div
+            className="relative"
+            onMouseEnter={() => setToursOpen(true)}
+            onMouseLeave={() => setToursOpen(false)}
+          >
+            <NavLink to="/tours" className={navLink}>
+              Tours <span className="text-xs">▾</span>
+            </NavLink>
+            {toursOpen && (
+              <div className="absolute left-0 top-full w-48 rounded-lg border border-gray-100 bg-white py-2 shadow-lg">
+                {TOUR_TYPES.map((t) => (
+                  <NavLink
+                    key={t.value}
+                    to={`/tours/${t.urlSlug}`}
+                    className="block px-4 py-2 text-sm text-gray-600 transition hover:bg-teal-50 hover:text-teal-700"
+                  >
+                    {t.pluralLabel}
+                  </NavLink>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div
             className="relative"
@@ -121,15 +135,19 @@ export default function Navbar() {
             <NavLink to="/" end className="rounded-lg px-2 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" onClick={() => setMobileOpen(false)}>
               Home
             </NavLink>
-            <NavLink to={CATEGORIES.packageTours.publicPath} className="rounded-lg px-2 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" onClick={() => setMobileOpen(false)}>
-              Package Tours
+            <NavLink to="/tours" className="rounded-lg px-2 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" onClick={() => setMobileOpen(false)}>
+              Tours
             </NavLink>
-            <NavLink to={CATEGORIES.dailyTours.publicPath} className="rounded-lg px-2 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" onClick={() => setMobileOpen(false)}>
-              Daily Tours
-            </NavLink>
-            <NavLink to={CATEGORIES.activities.publicPath} className="rounded-lg px-2 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" onClick={() => setMobileOpen(false)}>
-              Activities
-            </NavLink>
+            {TOUR_TYPES.map((t) => (
+              <NavLink
+                key={t.value}
+                to={`/tours/${t.urlSlug}`}
+                className="rounded-lg px-2 py-2 pl-6 text-sm font-medium text-gray-600 hover:bg-gray-50"
+                onClick={() => setMobileOpen(false)}
+              >
+                {t.pluralLabel}
+              </NavLink>
+            ))}
 
             <p className="mt-2 px-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
               Company

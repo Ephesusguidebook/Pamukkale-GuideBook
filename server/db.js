@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcryptjs');
+const slugify = require('slugify');
 
 // Simple, dependency-free JSON file based data layer.
 // Avoids native (compiled) packages like better-sqlite3, so it runs fine on
@@ -11,9 +12,12 @@ const DATA_FILE = path.join(__dirname, 'data.json');
 function emptyState() {
   return {
     adminUsers: [],
-    packageTours: [],
-    dailyTours: [],
-    activities: [],
+    // Package Tours, Daily Tours and Activities used to be three separate
+    // collections. They're now unified into one `tours` collection with a
+    // `type` field, presented publicly under /tours with type + departure
+    // filters — see migrateLegacyToursCollections() below for the one-time
+    // migration that merges any pre-existing data into this shape.
+    tours: [],
     blogPosts: [],
     contactMessages: [],
     mediaFolders: [],
@@ -45,9 +49,7 @@ function emptyState() {
     siteFiles: {},
     counters: {
       adminUsers: 0,
-      packageTours: 0,
-      dailyTours: 0,
-      activities: 0,
+      tours: 0,
       blogPosts: 0,
       contactMessages: 0,
       images: 0,
@@ -75,24 +77,108 @@ function load() {
       counters: { ...base.counters, ...(parsed.counters || {}) },
     };
 
-    // One-time migration from the old single "tours" collection (pre
-    // package-tours / daily-tours / activities split) into packageTours,
-    // so nothing that was already published gets silently lost.
-    if (Array.isArray(parsed.tours) && parsed.tours.length && merged.packageTours.length === 0) {
-      merged.packageTours = parsed.tours;
-      merged.counters.packageTours = parsed.counters?.tours || merged.counters.packageTours;
-      delete merged.tours;
-      console.log(
-        `[db] Migrated ${parsed.tours.length} legacy tour(s) into Package Tours. ` +
-          `Re-categorize them into Daily Tours / Activities from the admin panel if needed.`
-      );
-    }
-    delete merged.tours;
+    migrateLegacyToursCollections(merged, parsed);
 
     return merged;
   } catch {
     return base;
   }
+}
+
+// Segment keywords reserved by the /tours URL scheme (type filters and the
+// "from-" departure-point prefix) — a tour's slug can never equal one of
+// these, or it would be indistinguishable from a filter page.
+const TOUR_TYPES = ['package', 'daily', 'activity'];
+const RESERVED_TOUR_SLUGS = new Set(['tours', 'package', 'daily', 'activities', 'activity']);
+function isReservedTourSlug(slug) {
+  return RESERVED_TOUR_SLUGS.has(slug) || slug.startsWith('from-');
+}
+
+function departureSlug(value) {
+  return slugify(String(value || ''), { lower: true, strict: true });
+}
+
+// One-time migration: Package Tours, Daily Tours and Activities used to be
+// three separate collections (and, before that, an even older single
+// "tours" array pre-split). This merges whatever is found into the new
+// unified `tours` collection (tagged with a `type`), reassigning ids to
+// avoid collisions and de-duplicating/reserving slugs so every tour has a
+// slug that's safe under the new /tours/:slug routing. Existing
+// contactMessages that reference the old per-type ids are remapped so their
+// "item_title" lookups keep resolving correctly afterwards.
+function migrateLegacyToursCollections(merged, parsed) {
+  if (Array.isArray(merged.tours) && merged.tours.length > 0) return; // already migrated
+
+  // Extra-defensive: fold in the ancient pre-split single "tours" array too,
+  // in case some very old, never-migrated data.json shape is still in use.
+  const legacyPackage = Array.isArray(parsed.packageTours) ? parsed.packageTours : [];
+  const legacyDaily = Array.isArray(parsed.dailyTours) ? parsed.dailyTours : [];
+  const legacyActivities = Array.isArray(parsed.activities) ? parsed.activities : [];
+  const legacyPreSplit =
+    legacyPackage.length === 0 && legacyDaily.length === 0 && legacyActivities.length === 0 && Array.isArray(parsed.tours)
+      ? parsed.tours
+      : [];
+
+  const sources = [
+    { items: legacyPackage, type: 'package' },
+    { items: legacyDaily, type: 'daily' },
+    { items: legacyActivities, type: 'activity' },
+    { items: legacyPreSplit, type: 'package' },
+  ];
+  const legacyTotal = sources.reduce((sum, s) => sum + s.items.length, 0);
+  if (legacyTotal === 0) return;
+
+  const idMap = {}; // `${oldType}:${oldId}` -> newId
+  const usedSlugs = new Set();
+  let counter = (merged.counters && merged.counters.tours) || 0;
+
+  for (const { items, type } of sources) {
+    for (const item of items) {
+      counter += 1;
+      const newId = counter;
+      idMap[`${type}:${item.id}`] = newId;
+
+      // Same fix as entryRoutes.js's uniqueSlug(): a base that's blocked
+      // outright (reserved word, or anything starting with "from-") can
+      // never be fixed by appending a numeric suffix — the prefix/exact
+      // match would still hold for every candidate, looping forever.
+      // Prepending escapes both kinds of block in one step.
+      const rawBase = item.slug || 'tour';
+      const base = isReservedTourSlug(rawBase) ? `tour-${rawBase}` : rawBase;
+      let slug = base;
+      let i = 2;
+      while (isReservedTourSlug(slug) || usedSlugs.has(slug)) {
+        slug = `${base}-${i++}`;
+      }
+      usedSlugs.add(slug);
+
+      merged.tours.push({
+        ...item,
+        id: newId,
+        slug,
+        type,
+        departure_point: item.departure_point || '',
+      });
+    }
+  }
+
+  merged.counters.tours = counter;
+  merged.packageTours = [];
+  merged.dailyTours = [];
+  merged.activities = [];
+
+  const TYPE_TO_ITEM_TYPE = { package: 'package_tour', daily: 'daily_tour', activity: 'activity' };
+  (merged.contactMessages || []).forEach((msg) => {
+    if (!msg.item_id || !msg.item_type) return;
+    const type = Object.keys(TYPE_TO_ITEM_TYPE).find((t) => TYPE_TO_ITEM_TYPE[t] === msg.item_type);
+    if (!type) return;
+    const newId = idMap[`${type}:${msg.item_id}`];
+    if (newId) msg.item_id = newId;
+  });
+
+  console.log(
+    `[db] Migrated ${legacyTotal} item(s) from Package Tours / Daily Tours / Activities into the unified Tours collection.`
+  );
 }
 
 let state = load();
@@ -162,6 +248,8 @@ function normalizeEntryInput(input) {
   const originalPrice = Number(input.original_price) || 0;
   return {
     title: input.title,
+    type: TOUR_TYPES.includes(input.type) ? input.type : 'package',
+    departure_point: input.departure_point || '',
     summary: input.summary || '',
     description: input.description || '',
     price: Number(input.price) || 0,
@@ -279,9 +367,33 @@ function createEntryCollection(stateKey) {
   };
 }
 
-const packageTours = createEntryCollection('packageTours');
-const dailyTours = createEntryCollection('dailyTours');
-const activities = createEntryCollection('activities');
+const tours = createEntryCollection('tours');
+
+// Published tours matching an optional type and/or departure-point filter —
+// backs GET /api/tours?type=&departure= (the /tours, /tours/:type,
+// /tours/from-:departure and /tours/:type/from-:departure pages).
+tours.listPublishedByFilter = function ({ type, departureSlug: depSlug } = {}) {
+  return tours.listPublished().filter((t) => {
+    if (type && t.type !== type) return false;
+    if (depSlug && departureSlug(t.departure_point) !== depSlug) return false;
+    return true;
+  });
+};
+
+// Distinct departure points among published tours (deduped by slug, first-
+// seen casing kept as the display label) — drives the departure filter
+// chips on the /tours listing page.
+tours.distinctDeparturePoints = function () {
+  const seen = new Map();
+  tours.listPublished().forEach((t) => {
+    const label = String(t.departure_point || '').trim();
+    if (!label) return;
+    const slug = departureSlug(label);
+    if (!slug || seen.has(slug)) return;
+    seen.set(slug, label);
+  });
+  return Array.from(seen.entries()).map(([slug, label]) => ({ slug, label }));
+};
 
 // --- Blog ---
 function normalizeBlogInput(input) {
@@ -352,10 +464,15 @@ const blogPosts = {
 
 // --- Contact messages ---
 // item_type is one of: 'package_tour' | 'daily_tour' | 'activity' | null
+// All three legacy item_type strings now resolve against the single unified
+// `tours` collection (Package Tours / Daily Tours / Activities merged into
+// one, tagged by `type`) — kept as three keys so historical contactMessages
+// rows (and the ContactForm on tour detail pages, which still reports which
+// kind of tour was enquired about) keep working unchanged.
 const ITEM_COLLECTIONS = {
-  package_tour: () => packageTours,
-  daily_tour: () => dailyTours,
-  activity: () => activities,
+  package_tour: () => tours,
+  daily_tour: () => tours,
+  activity: () => tours,
 };
 
 const contactMessages = {
@@ -531,21 +648,9 @@ const PAGE_CONTENT_DEFAULTS = {
     seo_title: '',
     seo_description: '',
   },
-  packageTours: {
-    h1: 'Package Tours',
-    p: 'Multi-day, all-inclusive tour packages covering the best destinations in Turkey.',
-    seo_title: '',
-    seo_description: '',
-  },
-  dailyTours: {
-    h1: 'Daily Tours',
-    p: 'Single-day guided tours — see the highlights without an overnight stay.',
-    seo_title: '',
-    seo_description: '',
-  },
-  activities: {
-    h1: 'Activities',
-    p: 'Standalone experiences and activities you can add to your trip.',
+  tours: {
+    h1: 'Tours',
+    p: 'Explore our package tours, daily tours and standalone activities — filter by type or by where you\'re departing from.',
     seo_title: '',
     seo_description: '',
   },
@@ -831,14 +936,17 @@ const SITE_FILE_DEFAULTS = {
 
 ## Site Structure
 
-- /package-tours/ — multi-day, all-inclusive tour packages, listed with
-  price, duration, itinerary and included/excluded items. Each tour has its
-  own page at /package-tours/[slug]/.
-- /daily-tours/ — single-day guided tours. Each tour has its own page at
-  /daily-tours/[slug]/.
-- /activities/ — standalone activities and experiences (e.g. hot air
-  balloon rides, cooking classes). Each activity has its own page at
-  /activities/[slug]/.
+- /tours/ — every tour and activity in one listing, filterable by type and
+  by departure point. Each individual tour has its own page at
+  /tours/[slug]/.
+- /tours/package/ — multi-day, all-inclusive tour packages only, listed
+  with price, duration, itinerary and included/excluded items.
+- /tours/daily/ — single-day guided tours only.
+- /tours/activities/ — standalone activities and experiences only (e.g.
+  hot air balloon rides, cooking classes).
+- /tours/from-[departure-point]/ — tours filtered by where they depart
+  from (e.g. /tours/from-kusadasi/). Type and departure filters can combine,
+  e.g. /tours/daily/from-kusadasi/.
 - /blog/ — travel tips and destination guides, with individual posts at
   /blog/[slug]/.
 - /about-us/ — company information.
@@ -888,9 +996,7 @@ const siteFiles = {
 
 module.exports = {
   adminUsers,
-  packageTours,
-  dailyTours,
-  activities,
+  tours,
   blogPosts,
   contactMessages,
   mediaFolders,
@@ -901,4 +1007,7 @@ module.exports = {
   siteFiles,
   settings,
   pageContent,
+  TOUR_TYPES,
+  isReservedTourSlug,
+  departureSlug,
 };

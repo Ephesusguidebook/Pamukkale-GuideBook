@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../api';
+import { TOUR_TYPE_BY_VALUE } from '../../lib/tourRouting';
 
 // Generic admin list screen reused for Package Tours, Daily Tours and
 // Activities — each still hits its own API base (category.adminApiBase).
@@ -86,10 +87,18 @@ export default function AdminCategoryList({ category }) {
                 ) : null}
               </div>
               <div>
-                <p className="font-semibold text-gray-900">{item.title}</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold text-gray-900">{item.title}</p>
+                  {item.type && (
+                    <span className="rounded-full bg-teal-50 px-2 py-0.5 text-xs font-medium text-teal-700">
+                      {TOUR_TYPE_BY_VALUE[item.type]?.label || item.type}
+                    </span>
+                  )}
+                </div>
                 <p className="text-sm text-gray-500">
                   {item.location || 'No location'} · {item.duration_days} day(s) ·{' '}
                   {item.price} {item.currency}
+                  {item.departure_point ? ` · from ${item.departure_point}` : ''}
                 </p>
               </div>
             </div>

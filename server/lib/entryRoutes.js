@@ -24,9 +24,10 @@ function publicRouter(collection, notFoundMessage) {
   return router;
 }
 
-function adminRouter(collection, notFoundMessage, entityType) {
+function adminRouter(collection, notFoundMessage, entityType, options = {}) {
   const router = express.Router();
   router.use(requireAdmin);
+  const isSlugBlocked = options.isSlugBlocked || (() => false);
 
   function logAction(req, action, item) {
     db.adminLogs.create({
@@ -38,10 +39,17 @@ function adminRouter(collection, notFoundMessage, entityType) {
   }
 
   function uniqueSlug(title, ignoreId) {
-    const base = slugify(title, { lower: true, strict: true }) || 'item';
+    const rawBase = slugify(title, { lower: true, strict: true }) || 'item';
+    // A blocked base (e.g. a reserved word, or — critically — anything
+    // starting with "from-") can never be fixed by appending a numeric
+    // suffix alone, since the block condition (an exact word match, or a
+    // prefix match) would still hold for every "${base}-2", "${base}-3", ...
+    // candidate, looping forever. Prepending instead of appending escapes
+    // both kinds of block in one step.
+    const base = isSlugBlocked(rawBase) ? `tour-${rawBase}` : rawBase;
     let slug = base;
     let i = 2;
-    while (collection.slugExists(slug, ignoreId)) {
+    while (collection.slugExists(slug, ignoreId) || isSlugBlocked(slug)) {
       slug = `${base}-${i++}`;
     }
     return slug;

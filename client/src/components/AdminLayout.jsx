@@ -1,6 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAdminAuth } from '../AdminAuthContext';
-import { CATEGORY_LIST } from '../lib/categories';
 
 const linkClass = ({ isActive }) =>
   `rounded-lg px-3 py-2 text-sm font-medium transition ${
@@ -20,11 +19,9 @@ export default function AdminLayout() {
               <NavLink to="/admin" end className={linkClass}>
                 Overview
               </NavLink>
-              {CATEGORY_LIST.map((category) => (
-                <NavLink key={category.key} to={category.adminPath} className={linkClass}>
-                  {category.pluralLabel}
-                </NavLink>
-              ))}
+              <NavLink to="/admin/tours" className={linkClass}>
+                Tours
+              </NavLink>
               <NavLink to="/admin/blog" className={linkClass}>
                 Blog
               </NavLink>

@@ -68,7 +68,7 @@ export default function AdminRedirects() {
             <label className="label">Old Path (from)</label>
             <input
               className="input"
-              placeholder="/package-tours/old-tour-name"
+              placeholder="/package-tours/old-tour-name (or any old URL)"
               value={form.from_path}
               onChange={(e) => setForm((f) => ({ ...f, from_path: e.target.value }))}
             />
@@ -77,7 +77,7 @@ export default function AdminRedirects() {
             <label className="label">New Path (to)</label>
             <input
               className="input"
-              placeholder="/package-tours/new-tour-name"
+              placeholder="/tours/tour-name"
               value={form.to_path}
               onChange={(e) => setForm((f) => ({ ...f, to_path: e.target.value }))}
             />

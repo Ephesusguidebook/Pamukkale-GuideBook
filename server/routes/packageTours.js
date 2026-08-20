@@ -1,4 +1,0 @@
-const db = require('../db');
-const { publicRouter } = require('../lib/entryRoutes');
-
-module.exports = publicRouter(db.packageTours, 'Package tour not found.');

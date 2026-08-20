@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { TOUR_TYPE_BY_VALUE } from '../lib/tourRouting';
 
 function formatPrice(price, currency) {
   try {
@@ -36,11 +37,18 @@ export default function TourCard({ tour, basePath }) {
         )}
       </div>
       <div className="p-4">
-        {tour.location && (
-          <p className="text-xs font-medium uppercase tracking-wide text-amber-600">
-            {tour.location}
-          </p>
-        )}
+        <div className="flex items-center gap-2">
+          {tour.type && TOUR_TYPE_BY_VALUE[tour.type] && (
+            <span className="rounded-full bg-teal-50 px-2 py-0.5 text-xs font-medium text-teal-700">
+              {TOUR_TYPE_BY_VALUE[tour.type].label}
+            </span>
+          )}
+          {tour.location && (
+            <p className="text-xs font-medium uppercase tracking-wide text-amber-600">
+              {tour.location}
+            </p>
+          )}
+        </div>
         <h3 className="mt-1 line-clamp-2 text-base font-semibold text-gray-900">
           {tour.title}
         </h3>

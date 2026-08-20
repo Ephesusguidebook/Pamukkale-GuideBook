@@ -4,9 +4,12 @@ import api from '../../api';
 import MediaField from '../../components/MediaField';
 import ItineraryEditor from '../../components/ItineraryEditor';
 import RouteEditor from '../../components/RouteEditor';
+import { TOUR_TYPES } from '../../lib/tourRouting';
 
 const emptyItem = {
   title: '',
+  type: 'package',
+  departure_point: '',
   summary: '',
   description: '',
   price: '',
@@ -63,6 +66,8 @@ export default function AdminCategoryForm({ category }) {
         setForm({
           ...emptyItem,
           ...t,
+          type: t.type || 'package',
+          departure_point: t.departure_point || '',
           price: t.price ?? '',
           original_price: t.original_price || '',
           capacity: t.capacity ?? '',
@@ -131,6 +136,39 @@ export default function AdminCategoryForm({ category }) {
               value={form.title}
               onChange={(e) => update('title', e.target.value)}
             />
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="label">Type *</label>
+              <select
+                className="input"
+                value={form.type}
+                onChange={(e) => update('type', e.target.value)}
+              >
+                {TOUR_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                Shown at /tours/{TOUR_TYPES.find((t) => t.value === form.type)?.urlSlug} and mixed
+                into the main /tours listing.
+              </p>
+            </div>
+            <div>
+              <label className="label">Departure Point</label>
+              <input
+                className="input"
+                placeholder="e.g. Kusadasi"
+                value={form.departure_point}
+                onChange={(e) => update('departure_point', e.target.value)}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Optional. Adds this tour to the /tours/from-{'{'}place{'}'} filter (e.g. "Kusadasi"
+                → /tours/from-kusadasi). Leave empty if not relevant.
+              </p>
+            </div>
           </div>
           <div>
             <label className="label">Short Summary</label>

@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
-import { CATEGORY_LIST } from '../../lib/categories';
 
 const extraLinks = [
+  { to: '/admin/tours', label: 'Tours', description: 'Manage Package Tours, Daily Tours and Activities — all under /tours.' },
   { to: '/admin/blog', label: 'Blog Posts', description: 'Write and manage blog articles.' },
   { to: '/admin/messages', label: 'Messages', description: 'View enquiries sent through the site.' },
   { to: '/admin/media', label: 'Media Library', description: 'Upload and organize photos, converted to WebP automatically.' },
@@ -18,14 +18,6 @@ export default function AdminHome() {
     <div>
       <h1 className="mb-6 text-2xl font-bold text-gray-900">Admin Panel</h1>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {CATEGORY_LIST.map((category) => (
-          <Link key={category.key} to={category.adminPath} className="card p-6 transition hover:-translate-y-0.5 hover:shadow-md">
-            <p className="font-semibold text-gray-900">{category.pluralLabel}</p>
-            <p className="mt-1 text-sm text-gray-500">
-              Manage {category.pluralLabel.toLowerCase()} shown at {category.publicPath}/
-            </p>
-          </Link>
-        ))}
         {extraLinks.map((link) => (
           <Link key={link.to} to={link.to} className="card p-6 transition hover:-translate-y-0.5 hover:shadow-md">
             <p className="font-semibold text-gray-900">{link.label}</p>

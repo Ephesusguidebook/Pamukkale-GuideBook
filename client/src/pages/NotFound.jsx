@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import ContactForm from '../components/ContactForm';
-import { CATEGORY_LIST } from '../lib/categories';
+import { TOUR_TYPES } from '../lib/tourRouting';
 import useSeo from '../lib/useSeo';
 
 export default function NotFound() {
@@ -36,14 +36,14 @@ export default function NotFound() {
           Or explore what we offer
         </h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {CATEGORY_LIST.map((category) => (
+          {TOUR_TYPES.map((type) => (
             <Link
-              key={category.key}
-              to={category.publicPath}
+              key={type.value}
+              to={`/tours/${type.urlSlug}`}
               className="card p-5 text-center transition hover:-translate-y-0.5 hover:shadow-md"
             >
-              <p className="font-semibold text-gray-900">{category.pluralLabel}</p>
-              <p className="mt-1 text-sm text-gray-500">{category.intro}</p>
+              <p className="font-semibold text-gray-900">{type.pluralLabel}</p>
+              <p className="mt-1 text-sm text-gray-500">{type.intro}</p>
             </Link>
           ))}
         </div>

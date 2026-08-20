@@ -8,11 +8,10 @@ import FaviconSetter from './components/FaviconSetter';
 import PageviewTracker from './components/PageviewTracker';
 import AdminLayout from './components/AdminLayout';
 import ProtectedRoute from './components/ProtectedRoute';
-import { CATEGORIES } from './lib/categories';
+import { TOURS_ADMIN_CATEGORY } from './lib/tourRouting';
 
 import Home from './pages/Home';
-import CategoryList from './pages/CategoryList';
-import CategoryDetail from './pages/CategoryDetail';
+import Tours from './pages/Tours';
 import BlogList from './pages/BlogList';
 import BlogDetail from './pages/BlogDetail';
 import AboutUs from './pages/AboutUs';
@@ -57,32 +56,9 @@ export default function App() {
       <Routes>
         <Route path="/" element={<PublicLayout><Home /></PublicLayout>} />
 
-        <Route
-          path={CATEGORIES.packageTours.publicPath}
-          element={<PublicLayout><CategoryList category={CATEGORIES.packageTours} /></PublicLayout>}
-        />
-        <Route
-          path={`${CATEGORIES.packageTours.publicPath}/:slug`}
-          element={<PublicLayout><CategoryDetail category={CATEGORIES.packageTours} /></PublicLayout>}
-        />
-
-        <Route
-          path={CATEGORIES.dailyTours.publicPath}
-          element={<PublicLayout><CategoryList category={CATEGORIES.dailyTours} /></PublicLayout>}
-        />
-        <Route
-          path={`${CATEGORIES.dailyTours.publicPath}/:slug`}
-          element={<PublicLayout><CategoryDetail category={CATEGORIES.dailyTours} /></PublicLayout>}
-        />
-
-        <Route
-          path={CATEGORIES.activities.publicPath}
-          element={<PublicLayout><CategoryList category={CATEGORIES.activities} /></PublicLayout>}
-        />
-        <Route
-          path={`${CATEGORIES.activities.publicPath}/:slug`}
-          element={<PublicLayout><CategoryDetail category={CATEGORIES.activities} /></PublicLayout>}
-        />
+        <Route path="/tours" element={<PublicLayout><Tours /></PublicLayout>} />
+        <Route path="/tours/:seg1" element={<PublicLayout><Tours /></PublicLayout>} />
+        <Route path="/tours/:seg1/:seg2" element={<PublicLayout><Tours /></PublicLayout>} />
 
         <Route path="/blog" element={<PublicLayout><BlogList /></PublicLayout>} />
         <Route path="/blog/:slug" element={<PublicLayout><BlogDetail /></PublicLayout>} />
@@ -104,32 +80,8 @@ export default function App() {
         >
           <Route index element={<AdminHome />} />
 
-          <Route
-            path={CATEGORIES.packageTours.adminPath.replace('/admin/', '')}
-            element={<AdminCategoryList category={CATEGORIES.packageTours} />}
-          />
-          <Route
-            path={`${CATEGORIES.packageTours.adminPath.replace('/admin/', '')}/:id`}
-            element={<AdminCategoryForm category={CATEGORIES.packageTours} />}
-          />
-
-          <Route
-            path={CATEGORIES.dailyTours.adminPath.replace('/admin/', '')}
-            element={<AdminCategoryList category={CATEGORIES.dailyTours} />}
-          />
-          <Route
-            path={`${CATEGORIES.dailyTours.adminPath.replace('/admin/', '')}/:id`}
-            element={<AdminCategoryForm category={CATEGORIES.dailyTours} />}
-          />
-
-          <Route
-            path={CATEGORIES.activities.adminPath.replace('/admin/', '')}
-            element={<AdminCategoryList category={CATEGORIES.activities} />}
-          />
-          <Route
-            path={`${CATEGORIES.activities.adminPath.replace('/admin/', '')}/:id`}
-            element={<AdminCategoryForm category={CATEGORIES.activities} />}
-          />
+          <Route path="tours" element={<AdminCategoryList category={TOURS_ADMIN_CATEGORY} />} />
+          <Route path="tours/:id" element={<AdminCategoryForm category={TOURS_ADMIN_CATEGORY} />} />
 
           <Route path="blog" element={<AdminBlogList />} />
           <Route path="blog/:id" element={<AdminBlogForm />} />

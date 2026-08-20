@@ -3,9 +3,7 @@ import api from '../../api';
 
 const PAGES = [
   { key: 'home', label: 'Home' },
-  { key: 'packageTours', label: 'Package Tours' },
-  { key: 'dailyTours', label: 'Daily Tours' },
-  { key: 'activities', label: 'Activities' },
+  { key: 'tours', label: 'Tours (/tours)' },
   { key: 'blog', label: 'Blog' },
   { key: 'aboutUs', label: 'About Us' },
   { key: 'contact', label: 'Contact' },

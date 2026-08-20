@@ -1,7 +1,8 @@
 # Pamukkale GuideBook — Tour Website
 
-A tour website with a public front end (Package Tours, Daily Tours, Activities, Blog and
-info pages) and an admin panel to manage all of that content.
+A tour website with a public front end (Tours — Package Tours, Daily Tours and Activities
+in one filterable section — plus a Blog and info pages) and an admin panel to manage all
+of that content.
 
 ## Folder Structure
 
@@ -17,15 +18,16 @@ required.
 ## URL Structure
 
 ```
-/                          → Home
-/package-tours/            → Package Tours listing
-/package-tours/[slug]/     → Package Tour detail
-/daily-tours/               → Daily Tours listing
-/daily-tours/[slug]/        → Daily Tour detail
-/activities/                → Activities listing
-/activities/[slug]/         → Activity detail
-/blog/                       → Blog listing
-/blog/[slug]/                → Blog post
+/                              → Home
+/tours/                        → Tours listing (Package + Daily + Activities, mixed)
+/tours/package/                → Type filter — Package Tours only
+/tours/daily/                  → Type filter — Daily Tours only
+/tours/activities/             → Type filter — Activities only
+/tours/from-[departure]/       → Departure filter (e.g. /tours/from-kusadasi/)
+/tours/[type]/from-[departure]/→ Type + departure filters combined, either order
+/tours/[slug]/                 → Tour detail page
+/blog/                         → Blog listing
+/blog/[slug]/                  → Blog post
 /about-us/
 /contact/
 /terms-and-conditions/
@@ -33,9 +35,7 @@ required.
 
 /admin/login                → Admin login
 /admin                       → Admin overview
-/admin/package-tours[/:id]   → Manage Package Tours
-/admin/daily-tours[/:id]     → Manage Daily Tours
-/admin/activities[/:id]      → Manage Activities
+/admin/tours[/:id]           → Manage Tours (Package/Daily/Activity, one screen)
 /admin/blog[/:id]            → Manage Blog Posts
 /admin/messages              → Contact form submissions
 /admin/media                 → Media Library (folders + photo uploads)
@@ -46,19 +46,23 @@ required.
 /admin/settings              → Travel consultant card + branding
 ```
 
-Package Tours, Daily Tours and Activities are each stored and managed independently
-(separate data collections, separate API endpoints, separate admin screens), even though
-they share the same UI components under the hood.
+Package Tours, Daily Tours and Activities are managed from a single **Tours** admin
+screen and stored in one data collection, tagged with a **Type** (Package/Daily/Activity)
+and an optional **Departure Point** (free text, e.g. "Kusadasi"). Publicly they all live
+under `/tours` — the base listing mixes every type together, and the Type and Departure
+Point filters (each with their own URL, and combinable) narrow it down. A tour's Type and
+Departure Point are set on its edit form under Admin > Tours.
 
 ## Features
 
-- **Front end:** Home page, three independent tour categories (Package Tours, Daily
-  Tours, Activities), a Blog, and static About Us / Terms and Conditions / Privacy Policy
-  pages. Every tour-like detail page has a gallery, day-by-day itinerary, map route, and a
-  contact form that ties enquiries back to the specific listing.
-- **Admin panel** (`/admin/login`): log in and add/edit/delete Package Tours, Daily Tours,
-  Activities and Blog Posts independently, each with its own list and form. For tour-like
-  items: title, summary, full description, price, currency, duration, location, start
+- **Front end:** Home page, a unified Tours section (Package Tours, Daily Tours and
+  Activities, filterable by type and by departure point), a Blog, and static About Us /
+  Terms and Conditions / Privacy Policy pages. Every tour detail page has a gallery,
+  day-by-day itinerary, map route, and a contact form that ties enquiries back to the
+  specific listing.
+- **Admin panel** (`/admin/login`): log in and add/edit/delete Tours (tagged Package/Daily/
+  Activity, with an optional Departure Point) and Blog Posts from one screen each. For
+  tours: title, summary, full description, price, currency, duration, location, start
   date, capacity, image gallery and day-by-day itinerary can all be set.
 - **Resilient front end:** unexpected render errors are caught by an `ErrorBoundary` so
   visitors never see a blank white screen.
@@ -142,9 +146,16 @@ If you're using the "Node.js Web Application" option:
 > (e.g. MySQL/PostgreSQL) — the architecture makes that migration straightforward.
 >
 > **Upgrading an existing deployment:** if this server was already running the previous
-> single-collection version, the first restart after this update automatically migrates
-> whatever was in the old "tours" list into Package Tours. Re-categorize any of those into
-> Daily Tours or Activities from the admin panel if needed.
+> version with separate Package Tours / Daily Tours / Activities collections, the first
+> restart after this update automatically migrates all of them into the single unified
+> **Tours** collection — each item keeps its content and is tagged with the matching
+> **Type** (Package/Daily/Activity), with **Departure Point** left blank (fill it in from
+> the admin panel where relevant, e.g. "Kusadasi", to enable the `/tours/from-...` filter
+> for that item). Any old slug that would collide with a reserved word used by the new URL
+> scheme (`tours`, `package`, `daily`, `activities`, `activity`, or anything starting with
+> `from-`) is automatically renamed with a `tour-` prefix so it keeps working as a normal
+> detail page. Old URLs like `/package-tours/...`, `/daily-tours/...` and `/activities/...`
+> will 404 after upgrading — add redirects for any you want preserved from `/admin/redirects`.
 
 ## Extra Features
 
@@ -158,12 +169,15 @@ If you're using the "Node.js Web Application" option:
   hosting providers (including Hostinger) give you an SMTP mailbox you can use here. If
   `SMTP_HOST` is left blank, email notifications are simply skipped.
 - **SEO**: `/sitemap.xml` is generated on every request from whatever is currently
-  published (tours, activities, blog posts, static pages). Package Tour / Daily Tour /
-  Activity pages and Blog posts include schema.org structured data (`TouristTrip` /
-  `BlogPosting`) for richer search results. Every tour/activity/blog post form and every
-  static page in Page Content also has its own **SEO Title** and **SEO Description** fields
-  — set the browser tab title and search-result snippet directly; leave them blank to fall
-  back to the title/summary already entered.
+  published — every tour, every distinct departure point (as a `/tours/from-...` entry),
+  every type filter, and blog posts and static pages. Tour pages and Blog posts include
+  schema.org structured data (`TouristTrip` / `BlogPosting`) for richer search results.
+  Filtered `/tours` pages (by type, by departure, or both) get their own auto-generated,
+  unique heading and meta description so they read as distinct pages rather than
+  duplicate content. Every tour/blog post form and every static page in Page Content also
+  has its own **SEO Title** and **SEO Description** fields — set the browser tab title and
+  search-result snippet directly; leave them blank to fall back to the title/summary
+  already entered.
 - **Site Files** (`/admin/site-files`): edit the raw text served at `/llms.txt` (describes
   the site to AI assistants/crawlers such as ChatGPT, Claude, Perplexity) and `/robots.txt`
   (tells search engines what they may crawl) directly from the admin panel — no code change
@@ -171,8 +185,8 @@ If you're using the "Node.js Web Application" option:
 - **404 page**: a genuinely unknown or deleted URL now shows a proper "Page Not Found"
   screen (with a real 404 HTTP status, so it also shows up correctly in Traffic &
   Crawlers → crawl errors) with a contact form (Name, Email, Phone, Message) so a lost
-  visitor can reach out directly, plus quick links to Package Tours, Daily Tours and
-  Activities.
+  visitor can reach out directly, plus quick links to each Tours type (Package, Daily,
+  Activities).
 - **Google Search Console / Analytics (GA4) / Ads** (`/admin/settings` → "Search Console,
   Analytics & Ads"): paste the verification code Search Console gives you, your GA4
   Measurement ID (`G-...`), and/or your Google Ads Conversion ID (`AW-...`) — you can paste
@@ -181,11 +195,14 @@ If you're using the "Node.js Web Application" option:
   snippet into the `<head>` of every page, exactly per Google's own setup instructions (one
   shared loader plus one `gtag('config', ...)` call per ID if both GA4 and Ads are set).
   Leave a field empty to leave that tag out entirely.
-- **Redirects** (`/admin/redirects`): after deleting a tour/activity/blog post, or renaming
-  one (which changes its URL), add a redirect from the old path to the new one (301
-  Permanent or 302 Temporary). The server checks every incoming page request against this
-  list before anything else, so old links and search results land visitors on the right
-  page instead of a "not found" error.
+- **Redirects** (`/admin/redirects`): after deleting a tour/blog post, or renaming one
+  (which changes its URL), add a redirect from the old path to the new one (301 Permanent
+  or 302 Temporary). The server checks every incoming page request against this list
+  before anything else, so old links and search results land visitors on the right page
+  instead of a "not found" error. Also useful for pointing old `/package-tours/...`,
+  `/daily-tours/...` and `/activities/...` links at their new `/tours/...` equivalents
+  after upgrading (see "Upgrading an existing deployment" above) — these redirects are not
+  created automatically and are added here manually.
 - **Branding**: `/admin/settings` has a Branding section for a Site Logo and Favicon, both
   chosen from the Media Library. The logo replaces the default "TurRota" mark in the navbar,
   and the favicon is applied site-wide automatically.
@@ -204,17 +221,18 @@ If you're using the "Node.js Web Application" option:
   Us, Terms and Conditions, and Privacy Policy.
 - **Media Library** (`/admin/media`): upload photos here first — organize them into
   folders if you like — and every photo is automatically converted to WebP for faster page
-  loads (falls back to the original file if a particular image can't be converted). Package
-  Tour / Daily Tour / Activity galleries, Blog cover images, and the consultant photo in
+  loads (falls back to the original file if a particular image can't be converted). Tour
+  galleries (Package/Daily/Activity alike), Blog cover images, and the consultant photo in
   Settings all pick their images from this library instead of uploading a file per form, so
   the same photo can be reused across multiple listings. Files are stored under
   `server/uploads/media/`.
 
 ## Demo Content
 
-`server/scripts/seed.js` publishes 6 Package Tours, 6 Daily Tours, 6 Activities and 6 Blog
-posts with realistic placeholder text and photos, so you can see the full site design
-populated. Run it against your own deployment:
+`server/scripts/seed.js` publishes 6 Package Tours, 6 Daily Tours and 6 Activities (18
+tours total, all under `/tours`, tagged with their Type) plus 6 Blog posts with realistic
+placeholder text and photos, so you can see the full site design populated. Run it against
+your own deployment:
 
 ```bash
 SITE_URL=https://pamukkaleguidebook.com ADMIN_EMAIL=you@example.com ADMIN_PASSWORD=yourpassword \

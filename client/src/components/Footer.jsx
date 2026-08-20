@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { CATEGORY_LIST } from '../lib/categories';
+import { TOUR_TYPES } from '../lib/tourRouting';
 import SocialLinks from './SocialLinks';
 
 export default function Footer() {
@@ -10,10 +10,15 @@ export default function Footer() {
           <div>
             <p className="mb-2 font-semibold text-gray-800">Tours</p>
             <ul className="space-y-1.5">
-              {CATEGORY_LIST.map((category) => (
-                <li key={category.key}>
-                  <Link to={category.publicPath} className="hover:text-teal-700">
-                    {category.pluralLabel}
+              <li>
+                <Link to="/tours" className="hover:text-teal-700">
+                  All Tours
+                </Link>
+              </li>
+              {TOUR_TYPES.map((t) => (
+                <li key={t.value}>
+                  <Link to={`/tours/${t.urlSlug}`} className="hover:text-teal-700">
+                    {t.pluralLabel}
                   </Link>
                 </li>
               ))}

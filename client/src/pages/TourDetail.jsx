@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import api from '../api';
 import ContactForm from '../components/ContactForm';
 import ConsultantCard from '../components/ConsultantCard';
 import RouteMap from '../components/RouteMap';
 import useJsonLd from '../lib/useJsonLd';
 import useSeo from '../lib/useSeo';
+import { TOUR_TYPE_BY_VALUE, TYPE_TO_CONTACT_ITEM_TYPE } from '../lib/tourRouting';
 
 function formatPrice(price, currency) {
   try {
@@ -19,9 +20,12 @@ function formatPrice(price, currency) {
   }
 }
 
-// Generic detail page reused for Package Tours, Daily Tours and Activities.
-export default function CategoryDetail({ category }) {
-  const { slug } = useParams();
+// Detail page for a single tour at /tours/:slug — replaces the old
+// per-category CategoryDetail, now generic across Package/Daily/Activity
+// (the `type` on the tour itself drives the breadcrumb, schema.org
+// touristType, and which contact-message item_type the enquiry is tagged
+// with).
+export default function TourDetail({ slug }) {
   const [item, setItem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -34,7 +38,7 @@ export default function CategoryDetail({ category }) {
     setLoading(true);
     setNotFound(false);
     api
-      .get(`${category.apiBase}/${slug}`)
+      .get(`/tours/${slug}`)
       .then((res) => {
         if (active) {
           setItem(res.data);
@@ -50,7 +54,9 @@ export default function CategoryDetail({ category }) {
     return () => {
       active = false;
     };
-  }, [slug, category.apiBase]);
+  }, [slug]);
+
+  const typeMeta = item ? TOUR_TYPE_BY_VALUE[item.type] : null;
 
   useSeo(
     item ? item.seo_title || item.title : undefined,
@@ -72,7 +78,7 @@ export default function CategoryDetail({ category }) {
               : item.cover_image
                 ? [item.cover_image]
                 : undefined,
-          touristType: category.label,
+          touristType: typeMeta?.label,
           itinerary:
             item.itinerary && item.itinerary.length
               ? item.itinerary.map((day) => ({
@@ -105,12 +111,12 @@ export default function CategoryDetail({ category }) {
   if (notFound || !item) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-16 text-center sm:px-6">
-        <h1 className="text-2xl font-bold text-gray-900">{category.label} not found</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Tour not found</h1>
         <p className="mt-2 text-gray-500">
-          This {category.label.toLowerCase()} may have been removed or is not published.
+          This tour may have been removed or is not published.
         </p>
-        <Link to={category.publicPath} className="btn-primary mt-6 inline-flex">
-          Back to {category.pluralLabel}
+        <Link to="/tours" className="btn-primary mt-6 inline-flex">
+          Back to Tours
         </Link>
       </div>
     );
@@ -153,9 +159,17 @@ export default function CategoryDetail({ category }) {
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
       <nav className="mb-6 text-sm text-gray-500">
-        <Link to={category.publicPath} className="hover:text-teal-700">
-          {category.pluralLabel}
+        <Link to="/tours" className="hover:text-teal-700">
+          Tours
         </Link>
+        {typeMeta && (
+          <>
+            <span className="mx-2">/</span>
+            <Link to={`/tours/${typeMeta.urlSlug}`} className="hover:text-teal-700">
+              {typeMeta.pluralLabel}
+            </Link>
+          </>
+        )}
         <span className="mx-2">/</span>
         <span className="text-gray-700">{item.title}</span>
       </nav>
@@ -206,6 +220,11 @@ export default function CategoryDetail({ category }) {
 
           <h1 className="mt-8 text-3xl font-bold text-gray-900">{item.title}</h1>
           <div className="mt-2 flex flex-wrap gap-3 text-sm text-gray-500">
+            {typeMeta && (
+              <span className="rounded-full bg-teal-50 px-2 py-0.5 font-medium text-teal-700">
+                {typeMeta.label}
+              </span>
+            )}
             {item.location && <span>📍 {item.location}</span>}
             <span>
               🗓️ {item.duration_days} {item.duration_days === 1 ? 'day' : 'days'}
@@ -213,6 +232,14 @@ export default function CategoryDetail({ category }) {
             </span>
             {item.start_date && <span>▶️ Start date: {item.start_date}</span>}
             {item.capacity > 0 && <span>👥 Capacity: {item.capacity}</span>}
+            {item.departure_point && item.departure_slug && (
+              <Link
+                to={`/tours/from-${item.departure_slug}`}
+                className="hover:text-teal-700 hover:underline"
+              >
+                🚌 Departs from {item.departure_point}
+              </Link>
+            )}
           </div>
 
           {/* --- Overview --- */}
@@ -371,7 +398,7 @@ export default function CategoryDetail({ category }) {
           </div>
 
           <ContactForm
-            itemType={category.contactItemType}
+            itemType={TYPE_TO_CONTACT_ITEM_TYPE[item.type]}
             itemId={item.id}
             itemTitle={item.title}
           />
