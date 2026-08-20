@@ -43,6 +43,9 @@ export default function AdminLayout() {
               <NavLink to="/admin/logs" className={linkClass}>
                 Activity Log
               </NavLink>
+              <NavLink to="/admin/site-files" className={linkClass}>
+                Site Files
+              </NavLink>
               <NavLink to="/admin/page-content" className={linkClass}>
                 Page Content
               </NavLink>

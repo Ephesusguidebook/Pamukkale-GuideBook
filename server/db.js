@@ -39,6 +39,7 @@ function emptyState() {
       site_favicon: '',
     },
     pageContent: {},
+    siteFiles: {},
     counters: {
       adminUsers: 0,
       packageTours: 0,
@@ -795,6 +796,74 @@ const visitLogs = {
   },
 };
 
+// --- Site files (llms.txt, robots.txt) ---
+// Served dynamically at /llms.txt and /robots.txt so the admin can edit
+// their raw text without a code change or redeploy.
+const SITE_URL = (process.env.SITE_URL || 'http://localhost:4000').replace(/\/$/, '');
+
+const SITE_FILE_DEFAULTS = {
+  llms_txt: `# Pamukkale GuideBook
+
+> A Turkey-based travel company offering Package Tours (multi-day), Daily
+> Tours (single-day), and standalone Activities, plus a travel blog.
+
+## Site Structure
+
+- /package-tours/ — multi-day, all-inclusive tour packages, listed with
+  price, duration, itinerary and included/excluded items. Each tour has its
+  own page at /package-tours/[slug]/.
+- /daily-tours/ — single-day guided tours. Each tour has its own page at
+  /daily-tours/[slug]/.
+- /activities/ — standalone activities and experiences (e.g. hot air
+  balloon rides, cooking classes). Each activity has its own page at
+  /activities/[slug]/.
+- /blog/ — travel tips and destination guides, with individual posts at
+  /blog/[slug]/.
+- /about-us/ — company information.
+- /contact/ — contact form for enquiries about any tour or activity.
+- /faq/ — frequently asked questions.
+- /terms-and-conditions/ and /privacy-policy/ — legal pages.
+
+## Content Freshness
+
+Package tours, daily tours, activities, blog posts and the headline/intro
+text on every page are managed by the site owner through a private admin
+panel (login required) and can change at any time — always prefer live data
+fetched from this site over cached or previously seen content.
+
+## Sitemap
+
+A machine-readable sitemap is available at /sitemap.xml.
+`,
+  robots_txt: `User-agent: *
+Allow: /
+Disallow: /admin
+
+Sitemap: ${SITE_URL}/sitemap.xml
+`,
+};
+
+const siteFiles = {
+  get() {
+    const stored = state.siteFiles || {};
+    return {
+      llms_txt: stored.llms_txt !== undefined ? stored.llms_txt : SITE_FILE_DEFAULTS.llms_txt,
+      robots_txt:
+        stored.robots_txt !== undefined ? stored.robots_txt : SITE_FILE_DEFAULTS.robots_txt,
+    };
+  },
+  update(input) {
+    const current = siteFiles.get();
+    state.siteFiles = {
+      llms_txt: input.llms_txt !== undefined ? String(input.llms_txt) : current.llms_txt,
+      robots_txt:
+        input.robots_txt !== undefined ? String(input.robots_txt) : current.robots_txt,
+    };
+    persist();
+    return siteFiles.get();
+  },
+};
+
 module.exports = {
   adminUsers,
   packageTours,
@@ -807,6 +876,7 @@ module.exports = {
   redirects,
   adminLogs,
   visitLogs,
+  siteFiles,
   settings,
   pageContent,
 };

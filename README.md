@@ -42,6 +42,7 @@ required.
 /admin/redirects             → Redirects (old URL → new URL)
 /admin/traffic                → Traffic & crawler log, crawl errors, pages/session
 /admin/logs                   → Admin activity log
+/admin/site-files             → Edit llms.txt and robots.txt
 /admin/settings              → Travel consultant card + branding
 ```
 
@@ -157,12 +158,21 @@ If you're using the "Node.js Web Application" option:
   hosting providers (including Hostinger) give you an SMTP mailbox you can use here. If
   `SMTP_HOST` is left blank, email notifications are simply skipped.
 - **SEO**: `/sitemap.xml` is generated on every request from whatever is currently
-  published (tours, activities, blog posts, static pages). `/llms.txt` describes the site
-  for AI crawlers. Package Tour / Daily Tour / Activity pages and Blog posts include
-  schema.org structured data (`TouristTrip` / `BlogPosting`) for richer search results.
-  Every tour/activity/blog post form and every static page in Page Content also has its own
-  **SEO Title** and **SEO Description** fields — set the browser tab title and search-result
-  snippet directly; leave them blank to fall back to the title/summary already entered.
+  published (tours, activities, blog posts, static pages). Package Tour / Daily Tour /
+  Activity pages and Blog posts include schema.org structured data (`TouristTrip` /
+  `BlogPosting`) for richer search results. Every tour/activity/blog post form and every
+  static page in Page Content also has its own **SEO Title** and **SEO Description** fields
+  — set the browser tab title and search-result snippet directly; leave them blank to fall
+  back to the title/summary already entered.
+- **Site Files** (`/admin/site-files`): edit the raw text served at `/llms.txt` (describes
+  the site to AI assistants/crawlers such as ChatGPT, Claude, Perplexity) and `/robots.txt`
+  (tells search engines what they may crawl) directly from the admin panel — no code change
+  or redeploy needed. Both are served dynamically from this saved text.
+- **404 page**: a genuinely unknown or deleted URL now shows a proper "Page Not Found"
+  screen (with a real 404 HTTP status, so it also shows up correctly in Traffic &
+  Crawlers → crawl errors) with a contact form (Name, Email, Phone, Message) so a lost
+  visitor can reach out directly, plus quick links to Package Tours, Daily Tours and
+  Activities.
 - **Redirects** (`/admin/redirects`): after deleting a tour/activity/blog post, or renaming
   one (which changes its URL), add a redirect from the old path to the new one (301
   Permanent or 302 Temporary). The server checks every incoming page request against this

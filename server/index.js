@@ -23,6 +23,9 @@ const settingsRouter = require('./routes/settings');
 const pageContentRouter = require('./routes/pageContent');
 const adminPageContentRouter = require('./routes/adminPageContent');
 const sitemapRouter = require('./routes/sitemap');
+const llmsTxtRouter = require('./routes/llmsTxt');
+const robotsTxtRouter = require('./routes/robotsTxt');
+const adminSiteFilesRouter = require('./routes/adminSiteFiles');
 const { detectBot } = require('./lib/botDetect');
 const { getOrSetSessionId } = require('./lib/session');
 
@@ -140,6 +143,7 @@ app.use('/api/admin/blog', adminBlogRouter);
 app.use('/api/admin/media', adminMediaRouter);
 app.use('/api/admin/redirects', adminRedirectsRouter);
 app.use('/api/admin/logs', adminLogsRouter);
+app.use('/api/admin/site-files', adminSiteFilesRouter);
 app.use('/api/track', trackRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/contact', contactRouter);
@@ -150,7 +154,11 @@ app.use('/api/admin/page-content', adminPageContentRouter);
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 // SEO: sitemap.xml regenerated on every request from published content.
+// llms.txt and robots.txt are served from admin-editable text (Admin >
+// Site Files) instead of a static file.
 app.use('/sitemap.xml', sitemapRouter);
+app.use('/llms.txt', llmsTxtRouter);
+app.use('/robots.txt', robotsTxtRouter);
 
 // Serve the React build in production (server/public — on hosts like
 // Hostinger where the "root directory" can only be server/, we put the

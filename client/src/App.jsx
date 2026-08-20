@@ -35,6 +35,7 @@ import AdminMedia from './pages/admin/AdminMedia';
 import AdminRedirects from './pages/admin/AdminRedirects';
 import AdminLogs from './pages/admin/AdminLogs';
 import AdminTraffic from './pages/admin/AdminTraffic';
+import AdminSiteFiles from './pages/admin/AdminSiteFiles';
 
 function PublicLayout({ children }) {
   return (
@@ -138,6 +139,7 @@ export default function App() {
           <Route path="redirects" element={<AdminRedirects />} />
           <Route path="logs" element={<AdminLogs />} />
           <Route path="traffic" element={<AdminTraffic />} />
+          <Route path="site-files" element={<AdminSiteFiles />} />
           <Route path="settings" element={<Settings />} />
           <Route path="page-content" element={<PageContent />} />
         </Route>
