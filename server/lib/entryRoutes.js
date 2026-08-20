@@ -1,6 +1,7 @@
 const express = require('express');
 const slugify = require('slugify');
 const { requireAdmin } = require('../middleware/auth');
+const db = require('../db');
 
 // Shared route factory used by Package Tours, Daily Tours, Activities and
 // Blog Posts. Each content type still gets its own collection, its own API
@@ -23,9 +24,18 @@ function publicRouter(collection, notFoundMessage) {
   return router;
 }
 
-function adminRouter(collection, notFoundMessage) {
+function adminRouter(collection, notFoundMessage, entityType) {
   const router = express.Router();
   router.use(requireAdmin);
+
+  function logAction(req, action, item) {
+    db.adminLogs.create({
+      admin_email: req.admin?.email,
+      action,
+      entity_type: entityType,
+      entity_label: item?.title,
+    });
+  }
 
   function uniqueSlug(title, ignoreId) {
     const base = slugify(title, { lower: true, strict: true }) || 'item';
@@ -54,6 +64,7 @@ function adminRouter(collection, notFoundMessage) {
     }
     const slug = uniqueSlug(b.title);
     const item = collection.create({ ...b, slug });
+    logAction(req, 'create', item);
     res.status(201).json(item);
   });
 
@@ -68,12 +79,15 @@ function adminRouter(collection, notFoundMessage) {
     const slug = b.title !== existing.title ? uniqueSlug(b.title, existing.id) : existing.slug;
 
     const item = collection.update(existing.id, { ...b, slug });
+    logAction(req, 'update', item);
     res.json(item);
   });
 
   router.delete('/:id', (req, res) => {
+    const existing = collection.getById(req.params.id);
     const ok = collection.remove(req.params.id);
     if (!ok) return res.status(404).json({ error: notFoundMessage });
+    logAction(req, 'delete', existing);
     res.json({ ok: true });
   });
 

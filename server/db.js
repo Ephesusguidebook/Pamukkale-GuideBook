@@ -19,6 +19,8 @@ function emptyState() {
     mediaFolders: [],
     mediaItems: [],
     redirects: [],
+    adminLogs: [],
+    visitLogs: [],
     settings: {
       consultant_name: '',
       consultant_title: '',
@@ -50,6 +52,8 @@ function emptyState() {
       mediaFolders: 0,
       mediaItems: 0,
       redirects: 0,
+      adminLogs: 0,
+      visitLogs: 0,
     },
   };
 }
@@ -666,6 +670,131 @@ const redirects = {
   },
 };
 
+// --- Admin activity log ---
+// Records who did what (login, create/update/delete, settings changes, ...)
+// so there's an audit trail of admin actions on the site.
+const MAX_ADMIN_LOGS = 3000;
+
+const adminLogs = {
+  create(input) {
+    const entry = {
+      id: nextId('adminLogs'),
+      admin_email: input.admin_email || '',
+      action: input.action || '', // 'login' | 'create' | 'update' | 'delete'
+      entity_type: input.entity_type || '',
+      entity_label: input.entity_label || '',
+      created_at: nowIso(),
+    };
+    state.adminLogs.push(entry);
+    if (state.adminLogs.length > MAX_ADMIN_LOGS) {
+      state.adminLogs.splice(0, state.adminLogs.length - MAX_ADMIN_LOGS);
+    }
+    persist();
+    return entry;
+  },
+  listRecent(limit) {
+    const n = Math.min(Number(limit) || 100, 500);
+    return [...state.adminLogs].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)).slice(0, n);
+  },
+};
+
+// --- Site traffic / crawler log ---
+// Two kinds of entries share this table:
+//  - "server": every real HTTP page request the server handles, tagged with
+//    the final status code and whether the User-Agent matched a known bot
+//    (Googlebot, GPTBot, ClaudeBot, ...). This is what surfaces crawl
+//    errors (404s) and AI/search-bot activity.
+//  - "client": a small ping the React app sends on every in-app route
+//    change, tagged with a session id — this is what lets "pages per
+//    session" be counted for real visitors (bots rarely run the JS).
+const MAX_VISIT_LOGS = 8000;
+
+const visitLogs = {
+  create(input) {
+    const entry = {
+      id: nextId('visitLogs'),
+      source: input.source === 'client' ? 'client' : 'server',
+      path: input.path || '',
+      status_code: input.status_code || null,
+      is_bot: !!input.is_bot,
+      bot_name: input.bot_name || null,
+      user_agent: input.user_agent || '',
+      referrer: input.referrer || '',
+      session_id: input.session_id || '',
+      created_at: nowIso(),
+    };
+    state.visitLogs.push(entry);
+    if (state.visitLogs.length > MAX_VISIT_LOGS) {
+      state.visitLogs.splice(0, state.visitLogs.length - MAX_VISIT_LOGS);
+    }
+    persist();
+    return entry;
+  },
+  listRecent({ limit, onlyBots, onlyHuman, onlyErrors } = {}) {
+    let rows = [...state.visitLogs];
+    if (onlyBots) rows = rows.filter((r) => r.is_bot);
+    if (onlyHuman) rows = rows.filter((r) => !r.is_bot);
+    if (onlyErrors) rows = rows.filter((r) => (r.status_code || 0) >= 400);
+    rows.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+    const n = Math.min(Number(limit) || 100, 500);
+    return rows.slice(0, n);
+  },
+  summary() {
+    const rows = state.visitLogs;
+    const serverRows = rows.filter((r) => r.source === 'server');
+    const clientRows = rows.filter((r) => r.source === 'client');
+    const botRows = serverRows.filter((r) => r.is_bot);
+    const humanServerRows = serverRows.filter((r) => !r.is_bot);
+    const errorRows = serverRows.filter((r) => (r.status_code || 0) >= 400);
+
+    const botCounts = {};
+    botRows.forEach((r) => {
+      const name = r.bot_name || 'Unknown Bot';
+      botCounts[name] = (botCounts[name] || 0) + 1;
+    });
+    const topBots = Object.entries(botCounts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    // Sessions come from the client-side pageview pings — bots typically
+    // don't run the app's JS, so this stays focused on real visitors.
+    const sessionMap = {};
+    clientRows.forEach((r) => {
+      if (!r.session_id) return;
+      if (!sessionMap[r.session_id]) {
+        sessionMap[r.session_id] = {
+          session_id: r.session_id,
+          pages: 0,
+          first_seen: r.created_at,
+          last_seen: r.created_at,
+        };
+      }
+      const s = sessionMap[r.session_id];
+      s.pages += 1;
+      if (r.created_at < s.first_seen) s.first_seen = r.created_at;
+      if (r.created_at > s.last_seen) s.last_seen = r.created_at;
+    });
+    const sessions = Object.values(sessionMap).sort((a, b) =>
+      a.last_seen < b.last_seen ? 1 : -1
+    );
+    const avgPagesPerSession = sessions.length
+      ? Math.round((sessions.reduce((sum, s) => sum + s.pages, 0) / sessions.length) * 10) / 10
+      : 0;
+
+    return {
+      totalVisits: serverRows.length,
+      botVisits: botRows.length,
+      humanVisits: humanServerRows.length,
+      errorCount: errorRows.length,
+      topBots,
+      sessionCount: sessions.length,
+      avgPagesPerSession,
+      recentSessions: sessions.slice(0, 50),
+    };
+  },
+};
+
 module.exports = {
   adminUsers,
   packageTours,
@@ -676,6 +805,8 @@ module.exports = {
   mediaFolders,
   mediaItems,
   redirects,
+  adminLogs,
+  visitLogs,
   settings,
   pageContent,
 };

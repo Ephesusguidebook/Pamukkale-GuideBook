@@ -5,6 +5,7 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import WhatsAppButton from './components/WhatsAppButton';
 import FaviconSetter from './components/FaviconSetter';
+import PageviewTracker from './components/PageviewTracker';
 import AdminLayout from './components/AdminLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import { CATEGORIES } from './lib/categories';
@@ -32,10 +33,13 @@ import Settings from './pages/admin/Settings';
 import PageContent from './pages/admin/PageContent';
 import AdminMedia from './pages/admin/AdminMedia';
 import AdminRedirects from './pages/admin/AdminRedirects';
+import AdminLogs from './pages/admin/AdminLogs';
+import AdminTraffic from './pages/admin/AdminTraffic';
 
 function PublicLayout({ children }) {
   return (
     <div className="flex min-h-screen flex-col">
+      <PageviewTracker />
       <Navbar />
       <main className="flex-1">{children}</main>
       <Footer />
@@ -132,6 +136,8 @@ export default function App() {
           <Route path="messages" element={<Messages />} />
           <Route path="media" element={<AdminMedia />} />
           <Route path="redirects" element={<AdminRedirects />} />
+          <Route path="logs" element={<AdminLogs />} />
+          <Route path="traffic" element={<AdminTraffic />} />
           <Route path="settings" element={<Settings />} />
           <Route path="page-content" element={<PageContent />} />
         </Route>

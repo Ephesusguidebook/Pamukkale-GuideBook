@@ -21,6 +21,7 @@ router.post('/login', (req, res) => {
     expiresIn: '7d',
   });
 
+  db.adminLogs.create({ admin_email: user.email, action: 'login', entity_type: 'auth' });
   res.json({ token, email: user.email });
 });
 

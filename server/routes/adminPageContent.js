@@ -10,7 +10,14 @@ router.get('/', requireAdmin, (req, res) => {
 
 // PUT /api/admin/page-content - admin only
 router.put('/', requireAdmin, (req, res) => {
-  res.json(db.pageContent.update(req.body || {}));
+  const updated = db.pageContent.update(req.body || {});
+  db.adminLogs.create({
+    admin_email: req.admin?.email,
+    action: 'update',
+    entity_type: 'page_content',
+    entity_label: 'Page content',
+  });
+  res.json(updated);
 });
 
 module.exports = router;

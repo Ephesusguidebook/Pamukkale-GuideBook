@@ -6,6 +6,8 @@ const extraLinks = [
   { to: '/admin/messages', label: 'Messages', description: 'View enquiries sent through the site.' },
   { to: '/admin/media', label: 'Media Library', description: 'Upload and organize photos, converted to WebP automatically.' },
   { to: '/admin/redirects', label: 'Redirects', description: 'Send an old page URL to a new one after deleting or renaming it.' },
+  { to: '/admin/traffic', label: 'Traffic & Crawlers', description: 'Bot/AI-crawler activity, crawl errors, and pages browsed per visitor session.' },
+  { to: '/admin/logs', label: 'Activity Log', description: 'A record of admin logins and every create, update or delete.' },
   { to: '/admin/page-content', label: 'Page Content', description: 'Edit the H1 and intro paragraph on every page.' },
   { to: '/admin/settings', label: 'Settings', description: 'Update the travel consultant card.' },
 ];

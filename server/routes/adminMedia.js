@@ -41,16 +41,29 @@ router.post('/folders', (req, res) => {
     return res.status(400).json({ error: 'Parent folder not found.' });
   }
   const folder = db.mediaFolders.create({ name, parent_id: parentId });
+  db.adminLogs.create({
+    admin_email: req.admin?.email,
+    action: 'create',
+    entity_type: 'media_folder',
+    entity_label: folder.name,
+  });
   res.status(201).json(folder);
 });
 
 router.delete('/folders/:id', (req, res) => {
+  const existing = db.mediaFolders.getById(req.params.id);
   const ok = db.mediaFolders.remove(req.params.id);
   if (!ok) {
     return res
       .status(400)
       .json({ error: 'Folder not found, or it still contains subfolders/photos.' });
   }
+  db.adminLogs.create({
+    admin_email: req.admin?.email,
+    action: 'delete',
+    entity_type: 'media_folder',
+    entity_label: existing?.name,
+  });
   res.json({ ok: true });
 });
 
@@ -110,6 +123,14 @@ router.post('/upload', upload.array('files', 30), async (req, res) => {
     }
   }
 
+  if (items.length) {
+    db.adminLogs.create({
+      admin_email: req.admin?.email,
+      action: 'create',
+      entity_type: 'media',
+      entity_label: `Uploaded ${items.length} photo${items.length === 1 ? '' : 's'}`,
+    });
+  }
   res.status(items.length ? 201 : 500).json({ items, errors });
 });
 
@@ -118,6 +139,12 @@ router.delete('/items/:id', (req, res) => {
   if (!item) return res.status(404).json({ error: 'Not found.' });
   db.mediaItems.remove(req.params.id);
   fs.unlink(path.join(mediaDir, item.filename), () => {});
+  db.adminLogs.create({
+    admin_email: req.admin?.email,
+    action: 'delete',
+    entity_type: 'media',
+    entity_label: item.original_name || item.filename,
+  });
   res.json({ ok: true });
 });
 

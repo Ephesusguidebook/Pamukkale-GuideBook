@@ -37,6 +37,12 @@ export default function AdminLayout() {
               <NavLink to="/admin/redirects" className={linkClass}>
                 Redirects
               </NavLink>
+              <NavLink to="/admin/traffic" className={linkClass}>
+                Traffic
+              </NavLink>
+              <NavLink to="/admin/logs" className={linkClass}>
+                Activity Log
+              </NavLink>
               <NavLink to="/admin/page-content" className={linkClass}>
                 Page Content
               </NavLink>

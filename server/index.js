@@ -14,6 +14,8 @@ const blogRouter = require('./routes/blog');
 const adminBlogRouter = require('./routes/adminBlog');
 const adminMediaRouter = require('./routes/adminMedia');
 const adminRedirectsRouter = require('./routes/adminRedirects');
+const adminLogsRouter = require('./routes/adminLogs');
+const trackRouter = require('./routes/track');
 const authRouter = require('./routes/auth');
 const db = require('./db');
 const contactRouter = require('./routes/contact');
@@ -21,12 +23,95 @@ const settingsRouter = require('./routes/settings');
 const pageContentRouter = require('./routes/pageContent');
 const adminPageContentRouter = require('./routes/adminPageContent');
 const sitemapRouter = require('./routes/sitemap');
+const { detectBot } = require('./lib/botDetect');
+const { getOrSetSessionId } = require('./lib/session');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+// Static assets we don't want cluttering the traffic log (page-level
+// requests only — the log exists to show real pages/crawl activity, not
+// every JS/CSS/image fetch).
+const STATIC_ASSET_RE = /\.(css|js|mjs|png|jpe?g|webp|gif|svg|ico|map|woff2?|ttf|eot)$/i;
+function isLoggablePath(pathname) {
+  if (pathname.startsWith('/api') || pathname.startsWith('/uploads') || pathname.startsWith('/assets')) {
+    return false;
+  }
+  return !STATIC_ASSET_RE.test(pathname);
+}
+
+// Package Tour / Daily Tour / Activity / Blog detail pages, plus the fixed
+// static pages — used so a bot/visitor hitting a genuinely unknown or
+// deleted URL gets a real 404 status (both for accurate crawl-error
+// reporting and for SEO), instead of always answering 200 like a typical
+// bare SPA catch-all would.
+const STATIC_PAGE_PATHS = new Set([
+  '/',
+  '/package-tours',
+  '/daily-tours',
+  '/activities',
+  '/blog',
+  '/about-us',
+  '/contact',
+  '/terms-and-conditions',
+  '/privacy-policy',
+  '/faq',
+]);
+const DETAIL_PREFIXES = [
+  { prefix: '/package-tours/', collection: () => db.packageTours },
+  { prefix: '/daily-tours/', collection: () => db.dailyTours },
+  { prefix: '/activities/', collection: () => db.activities },
+  { prefix: '/blog/', collection: () => db.blogPosts },
+];
+function isKnownPath(pathname) {
+  // The whole /admin panel is a legitimate (client-auth-gated) part of the
+  // app, not public content to validate against — always 200 so a direct
+  // load or hard refresh of any admin screen doesn't get a false 404.
+  if (pathname === '/admin' || pathname.startsWith('/admin/')) return true;
+  if (STATIC_PAGE_PATHS.has(pathname)) return true;
+  const match = DETAIL_PREFIXES.find((d) => pathname.startsWith(d.prefix));
+  if (!match) return false;
+  const slug = pathname.slice(match.prefix.length);
+  return !!match.collection().getPublishedBySlug(slug);
+}
+
 app.use(cors());
 app.use(express.json({ limit: '5mb' }));
+
+// Site traffic / crawler log — records every page-level request (final
+// status code included) tagged with bot detection, so admin can see
+// Google/AI-bot activity and crawl errors (404s). Registered early so
+// res.on('finish') captures whatever status code any later handler
+// (redirects, the SPA catch-all, static file serving) ends up setting.
+app.use((req, res, next) => {
+  // Captured up front, synchronously — a nested router that fully handles
+  // a request (e.g. the sitemap route) mutates req.url/req.path for the
+  // rest of that request's lifetime once it responds without calling
+  // next(), so reading req.path later inside the async 'finish' callback
+  // below would silently log the wrong (rewritten) path.
+  const requestPath = req.path;
+  if (req.method === 'GET' && isLoggablePath(requestPath)) {
+    const sessionId = getOrSetSessionId(req, res);
+    res.on('finish', () => {
+      try {
+        const botName = detectBot(req.headers['user-agent']);
+        db.visitLogs.create({
+          source: 'server',
+          path: requestPath,
+          status_code: res.statusCode,
+          is_bot: !!botName,
+          bot_name: botName,
+          user_agent: req.headers['user-agent'] || '',
+          referrer: req.headers['referer'] || '',
+          session_id: sessionId,
+        });
+      } catch {
+        // Never let logging break a real response.
+      }
+    });
+  }
+  next();
+});
 
 // Uploaded images
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -54,6 +139,8 @@ app.use('/api/blog', blogRouter);
 app.use('/api/admin/blog', adminBlogRouter);
 app.use('/api/admin/media', adminMediaRouter);
 app.use('/api/admin/redirects', adminRedirectsRouter);
+app.use('/api/admin/logs', adminLogsRouter);
+app.use('/api/track', trackRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/contact', contactRouter);
 app.use('/api/settings', settingsRouter);
@@ -73,7 +160,7 @@ if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next();
-    res.sendFile(path.join(clientDist, 'index.html'));
+    res.status(isKnownPath(req.path) ? 200 : 404).sendFile(path.join(clientDist, 'index.html'));
   });
 }
 
