@@ -1,10 +1,12 @@
 import { usePageContent } from '../PageContentContext';
+import useSeo from '../lib/useSeo';
 
 export default function Terms() {
-  const { h1, p } = usePageContent('terms', {
+  const { h1, p, seo_title, seo_description } = usePageContent('terms', {
     h1: 'Terms and Conditions',
     p: 'Please read these terms carefully before booking a tour or activity with us.',
   });
+  useSeo(seo_title || h1, seo_description || p);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-14 sm:px-6">

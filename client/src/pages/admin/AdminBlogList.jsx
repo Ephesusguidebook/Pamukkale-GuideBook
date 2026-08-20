@@ -19,7 +19,14 @@ export default function AdminBlogList() {
   useEffect(load, []);
 
   async function handleDelete(post) {
-    if (!window.confirm(`Are you sure you want to delete "${post.title}"?`)) return;
+    if (
+      !window.confirm(
+        `Are you sure you want to delete "${post.title}"?\n\n` +
+          `Its page (/blog/${post.slug}) will start returning "not found". If it's linked to ` +
+          `from elsewhere, add a redirect afterwards in Admin > Redirects.`
+      )
+    )
+      return;
     try {
       await api.delete(`/admin/blog/${post.id}`);
       setPosts((prev) => prev.filter((p) => p.id !== post.id));
@@ -40,11 +47,16 @@ export default function AdminBlogList() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-gray-900">Blog Posts</h1>
-        <Link to="/admin/blog/new" className="btn-primary">
-          + Add Blog Post
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link to="/admin/redirects" className="text-xs text-gray-500 hover:text-teal-700">
+            Deleted or renamed one? Add a redirect →
+          </Link>
+          <Link to="/admin/blog/new" className="btn-primary">
+            + Add Blog Post
+          </Link>
+        </div>
       </div>
 
       {loading && <p className="text-gray-500">Loading...</p>}

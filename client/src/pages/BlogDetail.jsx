@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import api from '../api';
 import useJsonLd from '../lib/useJsonLd';
+import useSeo from '../lib/useSeo';
 
 function formatDate(iso) {
   try {
@@ -40,6 +41,11 @@ export default function BlogDetail() {
       active = false;
     };
   }, [slug]);
+
+  useSeo(
+    post ? post.seo_title || post.title : undefined,
+    post ? post.seo_description || post.excerpt : undefined
+  );
 
   useJsonLd(
     post

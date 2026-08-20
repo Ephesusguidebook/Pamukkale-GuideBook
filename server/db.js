@@ -18,6 +18,7 @@ function emptyState() {
     contactMessages: [],
     mediaFolders: [],
     mediaItems: [],
+    redirects: [],
     settings: {
       consultant_name: '',
       consultant_title: '',
@@ -32,6 +33,8 @@ function emptyState() {
       contact_address: '',
       facebook_url: '',
       instagram_url: '',
+      site_logo: '',
+      site_favicon: '',
     },
     pageContent: {},
     counters: {
@@ -46,6 +49,7 @@ function emptyState() {
       routePoints: 0,
       mediaFolders: 0,
       mediaItems: 0,
+      redirects: 0,
     },
   };
 }
@@ -166,6 +170,8 @@ function normalizeEntryInput(input) {
     highlights: normalizeStringList(input.highlights),
     included: normalizeStringList(input.included),
     excluded: normalizeStringList(input.excluded),
+    seo_title: input.seo_title || '',
+    seo_description: input.seo_description || '',
   };
 }
 
@@ -278,6 +284,8 @@ function normalizeBlogInput(input) {
     cover_image: input.cover_image || '',
     author: input.author || '',
     status: input.status === 'draft' ? 'draft' : 'published',
+    seo_title: input.seo_title || '',
+    seo_description: input.seo_description || '',
   };
 }
 
@@ -478,6 +486,8 @@ const settings = {
       contact_address: input.contact_address || '',
       facebook_url: input.facebook_url || '',
       instagram_url: input.instagram_url || '',
+      site_logo: input.site_logo || '',
+      site_favicon: input.site_favicon || '',
     };
     persist();
     return state.settings;
@@ -491,42 +501,62 @@ const PAGE_CONTENT_DEFAULTS = {
   home: {
     h1: 'Find your dream tour and hit the road',
     p: 'Explore our carefully curated package tours, daily tours and activities. Detailed itineraries, transparent pricing and easy communication.',
+    seo_title: '',
+    seo_description: '',
   },
   packageTours: {
     h1: 'Package Tours',
     p: 'Multi-day, all-inclusive tour packages covering the best destinations in Turkey.',
+    seo_title: '',
+    seo_description: '',
   },
   dailyTours: {
     h1: 'Daily Tours',
     p: 'Single-day guided tours — see the highlights without an overnight stay.',
+    seo_title: '',
+    seo_description: '',
   },
   activities: {
     h1: 'Activities',
     p: 'Standalone experiences and activities you can add to your trip.',
+    seo_title: '',
+    seo_description: '',
   },
   blog: {
     h1: 'Blog',
     p: 'Travel tips, destination guides and stories from around Turkey.',
+    seo_title: '',
+    seo_description: '',
   },
   aboutUs: {
     h1: 'About Us',
     p: 'We are a Turkey-based travel company dedicated to helping you discover the country’s most remarkable destinations.',
+    seo_title: '',
+    seo_description: '',
   },
   contact: {
     h1: 'Contact',
     p: "Questions or special requests? Send us a message and we'll get back to you as soon as possible.",
+    seo_title: '',
+    seo_description: '',
   },
   terms: {
     h1: 'Terms and Conditions',
     p: 'Please read these terms carefully before booking a tour or activity with us.',
+    seo_title: '',
+    seo_description: '',
   },
   privacy: {
     h1: 'Privacy Policy',
     p: 'How we collect, use and protect the information you share with us.',
+    seo_title: '',
+    seo_description: '',
   },
   faq: {
     h1: 'Frequently Asked Questions',
     p: "Answers to the questions we hear most often. Can't find what you're looking for? Reach out through our contact page.",
+    seo_title: '',
+    seo_description: '',
   },
 };
 
@@ -540,17 +570,99 @@ const pageContent = {
     return merged;
   },
   update(input) {
+    const current = pageContent.get();
     const next = {};
     for (const key of Object.keys(PAGE_CONTENT_DEFAULTS)) {
       const b = (input && input[key]) || {};
       next[key] = {
-        h1: b.h1 !== undefined ? String(b.h1) : pageContent.get()[key].h1,
-        p: b.p !== undefined ? String(b.p) : pageContent.get()[key].p,
+        h1: b.h1 !== undefined ? String(b.h1) : current[key].h1,
+        p: b.p !== undefined ? String(b.p) : current[key].p,
+        seo_title: b.seo_title !== undefined ? String(b.seo_title) : current[key].seo_title,
+        seo_description:
+          b.seo_description !== undefined ? String(b.seo_description) : current[key].seo_description,
       };
     }
     state.pageContent = next;
     persist();
     return pageContent.get();
+  },
+};
+
+// --- Redirects ---
+// Lets the admin point an old/removed URL path at a new one (301 by
+// default) whenever a page is deleted or its title/slug changes.
+function normalizePath(raw) {
+  let s = String(raw || '').trim();
+  if (!s) return '';
+  // Allow pasting a full URL — keep only the path.
+  try {
+    if (/^https?:\/\//i.test(s)) {
+      s = new URL(s).pathname;
+    }
+  } catch {
+    // ignore, fall through and treat as a plain path
+  }
+  if (!s.startsWith('/')) s = `/${s}`;
+  if (s.length > 1 && s.endsWith('/')) s = s.slice(0, -1);
+  return s;
+}
+
+const redirects = {
+  listAll() {
+    return [...state.redirects].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+  },
+  getById(id) {
+    return state.redirects.find((r) => r.id === Number(id)) || null;
+  },
+  findByPath(pathname) {
+    const target = normalizePath(pathname);
+    return state.redirects.find((r) => r.from_path === target) || null;
+  },
+  create(input) {
+    const from_path = normalizePath(input.from_path);
+    const to_path = normalizePath(input.to_path);
+    if (!from_path || !to_path) throw new Error('Both paths are required.');
+    if (from_path === to_path) throw new Error('The two paths must be different.');
+    if (state.redirects.some((r) => r.from_path === from_path)) {
+      throw new Error('A redirect from that path already exists.');
+    }
+    const redirect = {
+      id: nextId('redirects'),
+      from_path,
+      to_path,
+      status_code: Number(input.status_code) === 302 ? 302 : 301,
+      created_at: nowIso(),
+    };
+    state.redirects.push(redirect);
+    persist();
+    return redirect;
+  },
+  update(id, input) {
+    const idx = state.redirects.findIndex((r) => r.id === Number(id));
+    if (idx === -1) return null;
+    const from_path = normalizePath(input.from_path);
+    const to_path = normalizePath(input.to_path);
+    if (!from_path || !to_path) throw new Error('Both paths are required.');
+    if (from_path === to_path) throw new Error('The two paths must be different.');
+    if (state.redirects.some((r) => r.from_path === from_path && r.id !== Number(id))) {
+      throw new Error('A redirect from that path already exists.');
+    }
+    const updated = {
+      ...state.redirects[idx],
+      from_path,
+      to_path,
+      status_code: Number(input.status_code) === 302 ? 302 : 301,
+    };
+    state.redirects[idx] = updated;
+    persist();
+    return updated;
+  },
+  remove(id) {
+    const idx = state.redirects.findIndex((r) => r.id === Number(id));
+    if (idx === -1) return false;
+    state.redirects.splice(idx, 1);
+    persist();
+    return true;
   },
 };
 
@@ -563,6 +675,7 @@ module.exports = {
   contactMessages,
   mediaFolders,
   mediaItems,
+  redirects,
   settings,
   pageContent,
 };

@@ -1,10 +1,12 @@
 import { usePageContent } from '../PageContentContext';
+import useSeo from '../lib/useSeo';
 
 export default function PrivacyPolicy() {
-  const { h1, p } = usePageContent('privacy', {
+  const { h1, p, seo_title, seo_description } = usePageContent('privacy', {
     h1: 'Privacy Policy',
     p: 'How we collect, use and protect the information you share with us.',
   });
+  useSeo(seo_title || h1, seo_description || p);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-14 sm:px-6">

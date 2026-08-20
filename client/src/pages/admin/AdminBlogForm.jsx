@@ -10,6 +10,8 @@ const emptyPost = {
   author: '',
   status: 'draft',
   cover_image: '',
+  seo_title: '',
+  seo_description: '',
 };
 
 export default function AdminBlogForm() {
@@ -116,6 +118,33 @@ export default function AdminBlogForm() {
             multiple={false}
             onChange={(imgs) => update('cover_image', imgs[0]?.url || '')}
           />
+        </div>
+
+        <div className="card space-y-4 p-6">
+          <h2 className="font-semibold text-gray-800">SEO</h2>
+          <p className="text-xs text-gray-500">
+            Controls the browser tab title and search-result snippet for this post. Leave
+            empty to fall back to the title and excerpt above.
+          </p>
+          <div>
+            <label className="label">SEO Title</label>
+            <input
+              className="input"
+              placeholder={form.title || 'Defaults to the title above'}
+              value={form.seo_title}
+              onChange={(e) => update('seo_title', e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="label">SEO Description</label>
+            <textarea
+              className="input"
+              rows={3}
+              placeholder={form.excerpt || 'Defaults to the excerpt above'}
+              value={form.seo_description}
+              onChange={(e) => update('seo_description', e.target.value)}
+            />
+          </div>
         </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}

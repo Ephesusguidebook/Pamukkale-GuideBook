@@ -79,6 +79,32 @@ export default function PageContent() {
                 onChange={(e) => update(page.key, 'p', e.target.value)}
               />
             </div>
+            <div className="border-t border-gray-100 pt-3">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                SEO
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="label">SEO Title</label>
+                  <input
+                    className="input"
+                    placeholder={form[page.key]?.h1 || 'Defaults to the headline above'}
+                    value={form[page.key]?.seo_title || ''}
+                    onChange={(e) => update(page.key, 'seo_title', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="label">SEO Description</label>
+                  <textarea
+                    className="input"
+                    rows={2}
+                    placeholder={form[page.key]?.p || 'Defaults to the intro paragraph above'}
+                    value={form[page.key]?.seo_description || ''}
+                    onChange={(e) => update(page.key, 'seo_description', e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         ))}
 

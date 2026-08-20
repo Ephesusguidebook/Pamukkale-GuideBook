@@ -1,4 +1,5 @@
 import { usePageContent } from '../PageContentContext';
+import useSeo from '../lib/useSeo';
 
 const FAQ_ITEMS = [
   {
@@ -28,10 +29,11 @@ const FAQ_ITEMS = [
 ];
 
 export default function Faq() {
-  const { h1, p } = usePageContent('faq', {
+  const { h1, p, seo_title, seo_description } = usePageContent('faq', {
     h1: 'Frequently Asked Questions',
     p: 'Answers to the questions we hear most often. Can\'t find what you\'re looking for? Reach out through our contact page.',
   });
+  useSeo(seo_title || h1, seo_description || p);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-14 sm:px-6">

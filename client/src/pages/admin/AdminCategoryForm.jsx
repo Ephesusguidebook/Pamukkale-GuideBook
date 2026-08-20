@@ -25,6 +25,8 @@ const emptyItem = {
   images: [],
   itinerary: [],
   route: [],
+  seo_title: '',
+  seo_description: '',
 };
 
 // Converts a list to newline-separated text and back (for textarea fields).
@@ -71,6 +73,8 @@ export default function AdminCategoryForm({ category }) {
           highlights: t.highlights || [],
           included: t.included || [],
           excluded: t.excluded || [],
+          seo_title: t.seo_title || '',
+          seo_description: t.seo_description || '',
         });
       })
       .catch(() => setError(`Could not load this ${category.label.toLowerCase()}.`))
@@ -307,6 +311,33 @@ export default function AdminCategoryForm({ category }) {
         <div className="card space-y-3 p-6">
           <h2 className="font-semibold text-gray-800">Route (Map)</h2>
           <RouteEditor points={form.route} onChange={(pts) => update('route', pts)} />
+        </div>
+
+        <div className="card space-y-4 p-6">
+          <h2 className="font-semibold text-gray-800">SEO</h2>
+          <p className="text-xs text-gray-500">
+            Controls the browser tab title and search-result snippet for this page. Leave
+            empty to fall back to the title and summary above.
+          </p>
+          <div>
+            <label className="label">SEO Title</label>
+            <input
+              className="input"
+              placeholder={form.title || 'Defaults to the title above'}
+              value={form.seo_title}
+              onChange={(e) => update('seo_title', e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="label">SEO Description</label>
+            <textarea
+              className="input"
+              rows={3}
+              placeholder={form.summary || 'Defaults to the summary above'}
+              value={form.seo_description}
+              onChange={(e) => update('seo_description', e.target.value)}
+            />
+          </div>
         </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}

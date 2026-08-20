@@ -4,6 +4,7 @@ import { PageContentProvider } from './PageContentContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import WhatsAppButton from './components/WhatsAppButton';
+import FaviconSetter from './components/FaviconSetter';
 import AdminLayout from './components/AdminLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import { CATEGORIES } from './lib/categories';
@@ -30,6 +31,7 @@ import Messages from './pages/admin/Messages';
 import Settings from './pages/admin/Settings';
 import PageContent from './pages/admin/PageContent';
 import AdminMedia from './pages/admin/AdminMedia';
+import AdminRedirects from './pages/admin/AdminRedirects';
 
 function PublicLayout({ children }) {
   return (
@@ -46,6 +48,7 @@ export default function App() {
   return (
     <AdminAuthProvider>
       <PageContentProvider>
+      <FaviconSetter />
       <Routes>
         <Route path="/" element={<PublicLayout><Home /></PublicLayout>} />
 
@@ -128,6 +131,7 @@ export default function App() {
 
           <Route path="messages" element={<Messages />} />
           <Route path="media" element={<AdminMedia />} />
+          <Route path="redirects" element={<AdminRedirects />} />
           <Route path="settings" element={<Settings />} />
           <Route path="page-content" element={<PageContent />} />
         </Route>

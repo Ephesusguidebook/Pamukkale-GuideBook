@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api';
 import { usePageContent } from '../PageContentContext';
+import useSeo from '../lib/useSeo';
 
 function formatDate(iso) {
   try {
@@ -16,10 +17,11 @@ function formatDate(iso) {
 }
 
 export default function BlogList() {
-  const { h1, p } = usePageContent('blog', {
+  const { h1, p, seo_title, seo_description } = usePageContent('blog', {
     h1: 'Blog',
     p: 'Travel tips, destination guides and stories from around Turkey.',
   });
+  useSeo(seo_title || h1, seo_description || p);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

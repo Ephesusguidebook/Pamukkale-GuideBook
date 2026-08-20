@@ -16,6 +16,8 @@ const empty = {
   contact_address: '',
   facebook_url: '',
   instagram_url: '',
+  site_logo: '',
+  site_favicon: '',
 };
 
 export default function Settings() {
@@ -54,6 +56,8 @@ export default function Settings() {
 
   // Reuse the (multi-image) uploader for a single consultant photo.
   const photoAsList = form.consultant_photo ? [{ url: form.consultant_photo }] : [];
+  const logoAsList = form.site_logo ? [{ url: form.site_logo }] : [];
+  const faviconAsList = form.site_favicon ? [{ url: form.site_favicon }] : [];
 
   if (loading) return <p className="text-gray-500">Loading...</p>;
 
@@ -61,62 +65,88 @@ export default function Settings() {
     <div className="max-w-2xl">
       <h1 className="mb-6 text-2xl font-bold text-gray-900">Settings</h1>
       <form onSubmit={handleSubmit} className="card space-y-4 p-6">
-        <h2 className="font-semibold text-gray-800">Travel Consultant Card</h2>
+        <h2 className="font-semibold text-gray-800">Branding</h2>
         <p className="text-xs text-gray-500">
-          This information is shown in the "Travel Consultant" card on every tour detail page.
+          Chosen from the Media Library. Leave empty to use the default "TurRota" text logo /
+          browser favicon.
         </p>
-        <div>
-          <label className="label">Photo</label>
-          <MediaField
-            images={photoAsList}
-            multiple={false}
-            onChange={(imgs) => update('consultant_photo', imgs[0]?.url || '')}
-          />
-        </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="label">Full Name</label>
-            <input
-              className="input"
-              value={form.consultant_name}
-              onChange={(e) => update('consultant_name', e.target.value)}
+            <label className="label">Site Logo</label>
+            <MediaField
+              images={logoAsList}
+              multiple={false}
+              onChange={(imgs) => update('site_logo', imgs[0]?.url || '')}
             />
           </div>
           <div>
-            <label className="label">Title</label>
-            <input
-              className="input"
-              placeholder="e.g. Travel Consultant"
-              value={form.consultant_title}
-              onChange={(e) => update('consultant_title', e.target.value)}
+            <label className="label">Favicon</label>
+            <MediaField
+              images={faviconAsList}
+              multiple={false}
+              onChange={(imgs) => update('site_favicon', imgs[0]?.url || '')}
             />
           </div>
-          <div>
-            <label className="label">Phone</label>
-            <input
-              className="input"
-              placeholder="+90 5xx xxx xx xx"
-              value={form.consultant_phone}
-              onChange={(e) => update('consultant_phone', e.target.value)}
+        </div>
+
+        <div className="border-t border-gray-100 pt-4">
+          <h2 className="font-semibold text-gray-800">Travel Consultant Card</h2>
+          <p className="text-xs text-gray-500">
+            This information is shown in the "Travel Consultant" card on every tour detail page.
+          </p>
+          <div className="mt-3">
+            <label className="label">Photo</label>
+            <MediaField
+              images={photoAsList}
+              multiple={false}
+              onChange={(imgs) => update('consultant_photo', imgs[0]?.url || '')}
             />
           </div>
-          <div>
-            <label className="label">WhatsApp Number</label>
-            <input
-              className="input"
-              placeholder="905xxxxxxxxx (no + or spaces)"
-              value={form.consultant_whatsapp}
-              onChange={(e) => update('consultant_whatsapp', e.target.value)}
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="label">Email</label>
-            <input
-              type="email"
-              className="input"
-              value={form.consultant_email}
-              onChange={(e) => update('consultant_email', e.target.value)}
-            />
+          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="label">Full Name</label>
+              <input
+                className="input"
+                value={form.consultant_name}
+                onChange={(e) => update('consultant_name', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="label">Title</label>
+              <input
+                className="input"
+                placeholder="e.g. Travel Consultant"
+                value={form.consultant_title}
+                onChange={(e) => update('consultant_title', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="label">Phone</label>
+              <input
+                className="input"
+                placeholder="+90 5xx xxx xx xx"
+                value={form.consultant_phone}
+                onChange={(e) => update('consultant_phone', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="label">WhatsApp Number</label>
+              <input
+                className="input"
+                placeholder="905xxxxxxxxx (no + or spaces)"
+                value={form.consultant_whatsapp}
+                onChange={(e) => update('consultant_whatsapp', e.target.value)}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="label">Email</label>
+              <input
+                type="email"
+                className="input"
+                value={form.consultant_email}
+                onChange={(e) => update('consultant_email', e.target.value)}
+              />
+            </div>
           </div>
         </div>
 

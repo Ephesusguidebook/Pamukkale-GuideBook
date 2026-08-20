@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { CATEGORIES } from '../lib/categories';
+import api from '../api';
 
 const navLink = ({ isActive }) =>
   `text-sm font-medium transition ${
@@ -17,15 +18,35 @@ const COMPANY_LINKS = [
 export default function Navbar() {
   const [companyOpen, setCompanyOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [logo, setLogo] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    api
+      .get('/settings')
+      .then((res) => {
+        if (active) setLogo(res.data.site_logo || '');
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <header className="sticky top-0 z-40 border-b border-gray-100 bg-white/90 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
         <Link to="/" className="flex items-center gap-2" onClick={() => setMobileOpen(false)}>
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-700 text-white font-bold">
-            T
-          </span>
-          <span className="text-lg font-bold text-gray-900">TurRota</span>
+          {logo ? (
+            <img src={logo} alt="TurRota" className="h-9 w-auto object-contain" />
+          ) : (
+            <>
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-700 text-white font-bold">
+                T
+              </span>
+              <span className="text-lg font-bold text-gray-900">TurRota</span>
+            </>
+          )}
         </Link>
 
         {/* --- Desktop nav --- */}

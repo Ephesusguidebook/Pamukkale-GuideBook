@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import api from '../api';
 import ContactForm from '../components/ContactForm';
 import ConsultantCard from '../components/ConsultantCard';
 import RouteMap from '../components/RouteMap';
 import useJsonLd from '../lib/useJsonLd';
+import useSeo from '../lib/useSeo';
 
 function formatPrice(price, currency) {
   try {
@@ -25,6 +26,8 @@ export default function CategoryDetail({ category }) {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [activeImage, setActiveImage] = useState(0);
+  const trackRef = useRef(null);
+  const scrollTimeout = useRef(null);
 
   useEffect(() => {
     let active = true;
@@ -48,6 +51,11 @@ export default function CategoryDetail({ category }) {
       active = false;
     };
   }, [slug, category.apiBase]);
+
+  useSeo(
+    item ? item.seo_title || item.title : undefined,
+    item ? item.seo_description || item.summary || item.description : undefined
+  );
 
   // SEO structured data (schema.org TouristTrip) so search engines can show
   // rich results (price, availability) for this listing.
@@ -114,11 +122,33 @@ export default function CategoryDetail({ category }) {
       : item.cover_image
         ? [{ url: item.cover_image }]
         : [];
-  const mainImage = images[activeImage]?.url || item.cover_image;
   const hasDiscount = item.original_price > 0 && item.original_price > item.price;
   const discountPct = hasDiscount
     ? Math.round(100 - (item.price / item.original_price) * 100)
     : 0;
+
+  // Scrolls the main slider to a given slide — used by the thumbnail strip
+  // and the photo gallery grid below (the "sub galleries"). The main
+  // slider itself is navigated by swiping/dragging, not by clicking.
+  function goToImage(idx) {
+    setActiveImage(idx);
+    const track = trackRef.current;
+    if (track) {
+      track.scrollTo({ left: idx * track.clientWidth, behavior: 'smooth' });
+    }
+  }
+
+  // Keeps activeImage (and therefore the thumbnail highlight) in sync while
+  // the visitor swipes/scrolls the main slider by hand.
+  function handleTrackScroll() {
+    const track = trackRef.current;
+    if (!track) return;
+    if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
+    scrollTimeout.current = setTimeout(() => {
+      const idx = Math.round(track.scrollLeft / track.clientWidth);
+      setActiveImage(idx);
+    }, 100);
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
@@ -133,11 +163,26 @@ export default function CategoryDetail({ category }) {
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-3">
         <div className="lg:col-span-2">
           {/* --- Gallery --- */}
-          <div className="aspect-[16/9] w-full overflow-hidden rounded-2xl bg-gray-100">
-            {mainImage ? (
-              <img src={mainImage} alt={item.title} className="h-full w-full object-cover" />
+          {/* Main slider: swipe/drag to move between photos (scroll-snap) —
+              it is intentionally not clickable itself. */}
+          <div
+            ref={trackRef}
+            onScroll={handleTrackScroll}
+            className="flex aspect-[16/9] w-full snap-x snap-mandatory overflow-x-auto rounded-2xl bg-gray-100 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {images.length > 0 ? (
+              images.map((img, idx) => (
+                <div key={img.id || idx} className="h-full w-full flex-shrink-0 snap-center">
+                  <img
+                    src={img.url}
+                    alt={item.title}
+                    className="h-full w-full object-cover"
+                    draggable={false}
+                  />
+                </div>
+              ))
             ) : (
-              <div className="flex h-full items-center justify-center text-gray-300">
+              <div className="flex h-full w-full flex-shrink-0 items-center justify-center text-gray-300">
                 No image
               </div>
             )}
@@ -147,7 +192,8 @@ export default function CategoryDetail({ category }) {
               {images.map((img, idx) => (
                 <button
                   key={img.id || idx}
-                  onClick={() => setActiveImage(idx)}
+                  type="button"
+                  onClick={() => goToImage(idx)}
                   className={`h-16 w-24 flex-shrink-0 overflow-hidden rounded-lg border-2 ${
                     idx === activeImage ? 'border-teal-700' : 'border-transparent'
                   }`}
@@ -252,7 +298,11 @@ export default function CategoryDetail({ category }) {
                 {images.map((img, idx) => (
                   <button
                     key={img.id || idx}
-                    onClick={() => setActiveImage(idx)}
+                    type="button"
+                    onClick={() => {
+                      goToImage(idx);
+                      trackRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }}
                     className="aspect-square overflow-hidden rounded-lg bg-gray-100"
                   >
                     <img

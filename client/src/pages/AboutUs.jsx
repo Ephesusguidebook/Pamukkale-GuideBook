@@ -1,10 +1,12 @@
 import { usePageContent } from '../PageContentContext';
+import useSeo from '../lib/useSeo';
 
 export default function AboutUs() {
-  const { h1, p } = usePageContent('aboutUs', {
+  const { h1, p, seo_title, seo_description } = usePageContent('aboutUs', {
     h1: 'About Us',
     p: 'We are a Turkey-based travel company dedicated to helping you discover the country’s most remarkable destinations.',
   });
+  useSeo(seo_title || h1, seo_description || p);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-14 sm:px-6">

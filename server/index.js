@@ -13,7 +13,9 @@ const adminActivitiesRouter = require('./routes/adminActivities');
 const blogRouter = require('./routes/blog');
 const adminBlogRouter = require('./routes/adminBlog');
 const adminMediaRouter = require('./routes/adminMedia');
+const adminRedirectsRouter = require('./routes/adminRedirects');
 const authRouter = require('./routes/auth');
+const db = require('./db');
 const contactRouter = require('./routes/contact');
 const settingsRouter = require('./routes/settings');
 const pageContentRouter = require('./routes/pageContent');
@@ -29,6 +31,18 @@ app.use(express.json({ limit: '5mb' }));
 // Uploaded images
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Admin-configured redirects (e.g. after deleting or renaming a page) — must
+// run before the API routes / SPA catch-all so an old URL sends visitors
+// and search engines straight to the new one instead of a 404.
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next();
+  const redirect = db.redirects.findByPath(req.path);
+  if (redirect) {
+    return res.redirect(redirect.status_code, redirect.to_path);
+  }
+  next();
+});
+
 // API routes
 app.use('/api/package-tours', packageToursRouter);
 app.use('/api/admin/package-tours', adminPackageToursRouter);
@@ -39,6 +53,7 @@ app.use('/api/admin/activities', adminActivitiesRouter);
 app.use('/api/blog', blogRouter);
 app.use('/api/admin/blog', adminBlogRouter);
 app.use('/api/admin/media', adminMediaRouter);
+app.use('/api/admin/redirects', adminRedirectsRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/contact', contactRouter);
 app.use('/api/settings', settingsRouter);

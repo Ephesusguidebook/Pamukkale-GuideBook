@@ -4,6 +4,7 @@ import api from '../api';
 import TourCard from '../components/TourCard';
 import { CATEGORIES } from '../lib/categories';
 import { usePageContent } from '../PageContentContext';
+import useSeo from '../lib/useSeo';
 
 function CategorySection({ category, items }) {
   if (!items || items.length === 0) return null;
@@ -89,10 +90,11 @@ function BlogSection({ posts }) {
 }
 
 export default function Home() {
-  const { h1, p } = usePageContent('home', {
+  const { h1, p, seo_title, seo_description } = usePageContent('home', {
     h1: 'Find your dream tour and hit the road',
     p: 'Explore our carefully curated package tours, daily tours and activities. Detailed itineraries, transparent pricing and easy communication.',
   });
+  useSeo(seo_title || h1, seo_description || p);
 
   const [packageTours, setPackageTours] = useState([]);
   const [dailyTours, setDailyTours] = useState([]);

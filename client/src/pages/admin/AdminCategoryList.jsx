@@ -21,7 +21,14 @@ export default function AdminCategoryList({ category }) {
   useEffect(load, [category.adminApiBase]);
 
   async function handleDelete(item) {
-    if (!window.confirm(`Are you sure you want to delete "${item.title}"?`)) return;
+    if (
+      !window.confirm(
+        `Are you sure you want to delete "${item.title}"?\n\n` +
+          `Its page (${category.publicPath}/${item.slug}) will start returning "not found". ` +
+          `If it's linked to from elsewhere, add a redirect afterwards in Admin > Redirects.`
+      )
+    )
+      return;
     try {
       await api.delete(`${category.adminApiBase}/${item.id}`);
       setItems((prev) => prev.filter((t) => t.id !== item.id));
@@ -45,11 +52,16 @@ export default function AdminCategoryList({ category }) {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-gray-900">{category.pluralLabel}</h1>
-        <Link to={`${category.adminPath}/new`} className="btn-primary">
-          + Add {category.label}
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link to="/admin/redirects" className="text-xs text-gray-500 hover:text-teal-700">
+            Deleted or renamed one? Add a redirect →
+          </Link>
+          <Link to={`${category.adminPath}/new`} className="btn-primary">
+            + Add {category.label}
+          </Link>
+        </div>
       </div>
 
       {loading && <p className="text-gray-500">Loading...</p>}

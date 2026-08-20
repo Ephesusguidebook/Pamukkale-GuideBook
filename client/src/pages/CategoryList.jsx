@@ -2,15 +2,17 @@ import { useEffect, useState } from 'react';
 import api from '../api';
 import TourCard from '../components/TourCard';
 import { usePageContent } from '../PageContentContext';
+import useSeo from '../lib/useSeo';
 
 // Generic listing page reused for Package Tours, Daily Tours and Activities.
 // `category` comes from src/lib/categories.js and drives the API endpoint,
 // the URL prefix used for links, and the on-page copy.
 export default function CategoryList({ category }) {
-  const { h1, p } = usePageContent(category.pageKey, {
+  const { h1, p, seo_title, seo_description } = usePageContent(category.pageKey, {
     h1: category.heading,
     p: category.intro,
   });
+  useSeo(seo_title || h1, seo_description || p);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

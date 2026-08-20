@@ -3,12 +3,14 @@ import ContactForm from '../components/ContactForm';
 import SocialLinks from '../components/SocialLinks';
 import api from '../api';
 import { usePageContent } from '../PageContentContext';
+import useSeo from '../lib/useSeo';
 
 export default function Contact() {
-  const { h1, p } = usePageContent('contact', {
+  const { h1, p, seo_title, seo_description } = usePageContent('contact', {
     h1: 'Contact',
     p: "Questions or special requests? Send us a message and we'll get back to you as soon as possible.",
   });
+  useSeo(seo_title || h1, seo_description || p);
 
   const [settings, setSettings] = useState(null);
 
