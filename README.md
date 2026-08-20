@@ -39,7 +39,8 @@ required.
 /admin/blog[/:id]            → Manage Blog Posts
 /admin/messages              → Contact form submissions
 /admin/media                 → Media Library (folders + photo uploads)
-/admin/settings              → Travel consultant card
+/admin/redirects             → Redirects (old URL → new URL)
+/admin/settings              → Travel consultant card + branding
 ```
 
 Package Tours, Daily Tours and Activities are each stored and managed independently
@@ -157,6 +158,17 @@ If you're using the "Node.js Web Application" option:
   published (tours, activities, blog posts, static pages). `/llms.txt` describes the site
   for AI crawlers. Package Tour / Daily Tour / Activity pages and Blog posts include
   schema.org structured data (`TouristTrip` / `BlogPosting`) for richer search results.
+  Every tour/activity/blog post form and every static page in Page Content also has its own
+  **SEO Title** and **SEO Description** fields — set the browser tab title and search-result
+  snippet directly; leave them blank to fall back to the title/summary already entered.
+- **Redirects** (`/admin/redirects`): after deleting a tour/activity/blog post, or renaming
+  one (which changes its URL), add a redirect from the old path to the new one (301
+  Permanent or 302 Temporary). The server checks every incoming page request against this
+  list before anything else, so old links and search results land visitors on the right
+  page instead of a "not found" error.
+- **Branding**: `/admin/settings` has a Branding section for a Site Logo and Favicon, both
+  chosen from the Media Library. The logo replaces the default "TurRota" mark in the navbar,
+  and the favicon is applied site-wide automatically.
 - **FAQ page** (`/faq/`) is included and listed under the "Company" menu alongside About
   Us, Terms and Conditions, and Privacy Policy.
 - **Media Library** (`/admin/media`): upload photos here first — organize them into
