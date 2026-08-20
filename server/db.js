@@ -44,6 +44,10 @@ function emptyState() {
       google_site_verification: '',
       ga4_measurement_id: '',
       google_ads_id: '',
+      // Defaults to true so a fresh/upgraded deployment is never accidentally
+      // indexed before it's ready — turn it off from Admin > Settings once the
+      // site is ready to go live.
+      noindex_site: true,
     },
     pageContent: {},
     siteFiles: {},
@@ -632,6 +636,7 @@ const settings = {
       google_site_verification: extractSiteVerificationCode(input.google_site_verification),
       ga4_measurement_id: extractPrefixedId(input.ga4_measurement_id, 'G'),
       google_ads_id: extractPrefixedId(input.google_ads_id, 'AW'),
+      noindex_site: !!input.noindex_site,
     };
     persist();
     return state.settings;

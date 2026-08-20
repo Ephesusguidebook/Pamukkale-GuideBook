@@ -100,6 +100,18 @@ function isKnownPath(pathname) {
 app.use(cors());
 app.use(express.json({ limit: '5mb' }));
 
+// Pre-launch guard: while Admin > Settings has "Site not ready — noindex" on
+// (the default for a new/upgraded deployment), every single response — pages,
+// API calls, uploaded files — carries this header, so search engines never
+// index anything on the site before it's ready. Turn it off from Admin >
+// Settings once the site is ready to go live.
+app.use((req, res, next) => {
+  if (db.settings.get().noindex_site) {
+    res.set('X-Robots-Tag', 'noindex, nofollow');
+  }
+  next();
+});
+
 // Site traffic / crawler log — records every page-level request (final
 // status code included) tagged with bot detection, so admin can see
 // Google/AI-bot activity and crawl errors (404s). Registered early so
@@ -227,6 +239,17 @@ function buildGoogleHeadTags() {
   return tags.join('\n');
 }
 
+// Pre-launch guard: while Admin > Settings has "Site not ready — noindex" on
+// (the default for a new/upgraded deployment), every page tells search
+// engines not to index it, so the site can't accidentally start showing up
+// in search results before it's finished. Turn it off from Admin > Settings
+// once the site is ready to go live.
+function buildRobotsMetaTag() {
+  return db.settings.get().noindex_site
+    ? '<meta name="robots" content="noindex, nofollow" />'
+    : '';
+}
+
 if (indexHtmlTemplate) {
   // index: false — otherwise express.static silently serves public/index.html
   // for "/" itself (and any other directory-style request) before our
@@ -235,7 +258,7 @@ if (indexHtmlTemplate) {
   app.use(express.static(clientDist, { index: false }));
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next();
-    const headTags = buildGoogleHeadTags();
+    const headTags = [buildRobotsMetaTag(), buildGoogleHeadTags()].filter(Boolean).join('\n');
     const html = headTags ? indexHtmlTemplate.replace('<head>', `<head>\n    ${headTags}`) : indexHtmlTemplate;
     res.status(isKnownPath(req.path) ? 200 : 404).type('html').send(html);
   });

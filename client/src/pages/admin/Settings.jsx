@@ -21,6 +21,7 @@ const empty = {
   google_site_verification: '',
   ga4_measurement_id: '',
   google_ads_id: '',
+  noindex_site: true,
 };
 
 export default function Settings() {
@@ -68,6 +69,39 @@ export default function Settings() {
     <div className="max-w-2xl">
       <h1 className="mb-6 text-2xl font-bold text-gray-900">Settings</h1>
       <form onSubmit={handleSubmit} className="card space-y-4 p-6">
+        <div
+          className={`rounded-lg border p-4 ${
+            form.noindex_site
+              ? 'border-amber-300 bg-amber-50'
+              : 'border-teal-200 bg-teal-50'
+          }`}
+        >
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4"
+              checked={form.noindex_site}
+              onChange={(e) => update('noindex_site', e.target.checked)}
+            />
+            <span>
+              <span className="block font-semibold text-gray-800">
+                Site not finished yet — hide from search engines (noindex, nofollow)
+              </span>
+              <span className="mt-1 block text-xs text-gray-600">
+                While this is checked, every page tells Google and other search engines not
+                to index the site (via a <code>noindex</code> meta tag and header on every
+                response), so it can't accidentally start showing up in search results before
+                you're ready. This is on by default for a new deployment.{' '}
+                <strong>
+                  Remember to uncheck this and save once the site is finished and ready to go
+                  live
+                </strong>{' '}
+                — otherwise it will stay hidden from search engines indefinitely.
+              </span>
+            </span>
+          </label>
+        </div>
+
         <h2 className="font-semibold text-gray-800">Branding</h2>
         <p className="text-xs text-gray-500">
           Chosen from the Media Library. Leave empty to use the default "TurRota" text logo /
