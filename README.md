@@ -40,6 +40,8 @@ required.
 /admin/messages              → Contact form submissions
 /admin/media                 → Media Library (folders + photo uploads)
 /admin/redirects             → Redirects (old URL → new URL)
+/admin/traffic                → Traffic & crawler log, crawl errors, pages/session
+/admin/logs                   → Admin activity log
 /admin/settings              → Travel consultant card + branding
 ```
 
@@ -169,6 +171,17 @@ If you're using the "Node.js Web Application" option:
 - **Branding**: `/admin/settings` has a Branding section for a Site Logo and Favicon, both
   chosen from the Media Library. The logo replaces the default "TurRota" mark in the navbar,
   and the favicon is applied site-wide automatically.
+- **Activity log** (`/admin/logs`): every admin login and every create/update/delete
+  (tours, activities, blog posts, media, redirects, settings, page content) is recorded with
+  who did it and when.
+- **Traffic & crawlers** (`/admin/traffic`): every page-level request the server handles is
+  logged with its final HTTP status and User-Agent-based bot detection — Googlebot, GPTBot,
+  ClaudeBot, PerplexityBot and 20+ other search/AI/monitoring crawlers are recognized by
+  name. The dashboard shows bot vs. visitor traffic, crawl errors (404s — a genuinely
+  unknown or deleted URL now correctly returns 404 instead of always answering 200), and how
+  many pages real visitors browse per session (tracked via a lightweight session cookie and
+  a ping the site sends on every in-app page change — this stays focused on real visitors
+  since crawlers rarely run that JS).
 - **FAQ page** (`/faq/`) is included and listed under the "Company" menu alongside About
   Us, Terms and Conditions, and Privacy Policy.
 - **Media Library** (`/admin/media`): upload photos here first — organize them into
