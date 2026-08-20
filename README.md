@@ -173,6 +173,14 @@ If you're using the "Node.js Web Application" option:
   Crawlers → crawl errors) with a contact form (Name, Email, Phone, Message) so a lost
   visitor can reach out directly, plus quick links to Package Tours, Daily Tours and
   Activities.
+- **Google Search Console / Analytics (GA4) / Ads** (`/admin/settings` → "Search Console,
+  Analytics & Ads"): paste the verification code Search Console gives you, your GA4
+  Measurement ID (`G-...`), and/or your Google Ads Conversion ID (`AW-...`) — you can paste
+  either the bare code or the whole snippet Google shows you, the right value is pulled out
+  automatically. Saving injects the verification `<meta>` tag and the `gtag.js` install
+  snippet into the `<head>` of every page, exactly per Google's own setup instructions (one
+  shared loader plus one `gtag('config', ...)` call per ID if both GA4 and Ads are set).
+  Leave a field empty to leave that tag out entirely.
 - **Redirects** (`/admin/redirects`): after deleting a tour/activity/blog post, or renaming
   one (which changes its URL), add a redirect from the old path to the new one (301
   Permanent or 302 Temporary). The server checks every incoming page request against this

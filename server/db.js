@@ -37,6 +37,9 @@ function emptyState() {
       instagram_url: '',
       site_logo: '',
       site_favicon: '',
+      google_site_verification: '',
+      ga4_measurement_id: '',
+      google_ads_id: '',
     },
     pageContent: {},
     siteFiles: {},
@@ -471,6 +474,22 @@ const mediaItems = {
   },
 };
 
+// Admins usually paste whatever Google's own setup page gives them, which is
+// sometimes the bare code and sometimes the full <meta>/<script> snippet —
+// these pull just the meaningful value out of either so a paste always works.
+function extractSiteVerificationCode(raw) {
+  if (!raw) return '';
+  const str = String(raw).trim();
+  const match = str.match(/content=["']([^"']+)["']/i);
+  return match ? match[1].trim() : str;
+}
+function extractPrefixedId(raw, prefix) {
+  if (!raw) return '';
+  const str = String(raw).trim();
+  const match = str.match(new RegExp(`${prefix}-[A-Za-z0-9]+`));
+  return match ? match[0] : str;
+}
+
 // --- Site settings (Travel Consultant card, etc.) ---
 const settings = {
   get() {
@@ -493,6 +512,9 @@ const settings = {
       instagram_url: input.instagram_url || '',
       site_logo: input.site_logo || '',
       site_favicon: input.site_favicon || '',
+      google_site_verification: extractSiteVerificationCode(input.google_site_verification),
+      ga4_measurement_id: extractPrefixedId(input.ga4_measurement_id, 'G'),
+      google_ads_id: extractPrefixedId(input.google_ads_id, 'AW'),
     };
     persist();
     return state.settings;

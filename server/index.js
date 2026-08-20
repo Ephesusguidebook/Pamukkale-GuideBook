@@ -164,11 +164,65 @@ app.use('/robots.txt', robotsTxtRouter);
 // Hostinger where the "root directory" can only be server/, we put the
 // build output inside server itself).
 const clientDist = path.join(__dirname, 'public');
-if (fs.existsSync(clientDist)) {
-  app.use(express.static(clientDist));
+const indexHtmlPath = path.join(clientDist, 'index.html');
+const indexHtmlTemplate = fs.existsSync(indexHtmlPath) ? fs.readFileSync(indexHtmlPath, 'utf-8') : null;
+
+function escapeAttr(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// Google Search Console / Analytics (GA4) / Ads — IDs entered in Admin >
+// Settings, injected into every page's <head> exactly as Google's own setup
+// instructions specify: the verification meta tag and the gtag.js loader
+// both need to land in <head>, as early as possible, before the page's own
+// scripts run. If both GA4 and Ads IDs are set, Google's documented pattern
+// is one shared gtag.js loader plus one gtag('config', ...) call per ID,
+// rather than loading the library twice.
+function buildGoogleHeadTags() {
+  const s = db.settings.get();
+  const tags = [];
+  if (s.google_site_verification) {
+    tags.push(`<meta name="google-site-verification" content="${escapeAttr(s.google_site_verification)}" />`);
+  }
+  const ga4Id = s.ga4_measurement_id;
+  const adsId = s.google_ads_id;
+  if (ga4Id || adsId) {
+    const loaderId = escapeAttr(ga4Id || adsId);
+    const configCalls = [ga4Id, adsId]
+      .filter(Boolean)
+      .map((id) => `    gtag('config', '${escapeAttr(id)}');`)
+      .join('\n');
+    tags.push(
+      [
+        '<!-- Google tag (gtag.js) -->',
+        `<script async src="https://www.googletagmanager.com/gtag/js?id=${loaderId}"></script>`,
+        '<script>',
+        '    window.dataLayer = window.dataLayer || [];',
+        '    function gtag(){dataLayer.push(arguments);}',
+        "    gtag('js', new Date());",
+        configCalls,
+        '</script>',
+      ].join('\n')
+    );
+  }
+  return tags.join('\n');
+}
+
+if (indexHtmlTemplate) {
+  // index: false — otherwise express.static silently serves public/index.html
+  // for "/" itself (and any other directory-style request) before our
+  // catch-all below ever runs, so the Google tags above would be missing
+  // from the homepage's raw HTML.
+  app.use(express.static(clientDist, { index: false }));
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next();
-    res.status(isKnownPath(req.path) ? 200 : 404).sendFile(path.join(clientDist, 'index.html'));
+    const headTags = buildGoogleHeadTags();
+    const html = headTags ? indexHtmlTemplate.replace('<head>', `<head>\n    ${headTags}`) : indexHtmlTemplate;
+    res.status(isKnownPath(req.path) ? 200 : 404).type('html').send(html);
   });
 }
 

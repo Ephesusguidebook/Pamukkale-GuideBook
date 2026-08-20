@@ -18,6 +18,9 @@ const empty = {
   instagram_url: '',
   site_logo: '',
   site_favicon: '',
+  google_site_verification: '',
+  ga4_measurement_id: '',
+  google_ads_id: '',
 };
 
 export default function Settings() {
@@ -249,6 +252,55 @@ export default function Settings() {
               value={form.notification_email}
               onChange={(e) => update('notification_email', e.target.value)}
             />
+          </div>
+        </div>
+
+        <div className="border-t border-gray-100 pt-4">
+          <h2 className="font-semibold text-gray-800">Search Console, Analytics &amp; Ads</h2>
+          <p className="mt-1 text-xs text-gray-500">
+            Paste just the code, or the whole snippet Google gives you — either works, the
+            right part is picked out automatically. Saving here adds the tags to every page's
+            &lt;head&gt;, exactly as Google's own setup instructions ask for.
+          </p>
+          <div className="mt-3 space-y-4">
+            <div>
+              <label className="label">Google Search Console verification code</label>
+              <input
+                className="input font-mono text-xs"
+                placeholder='e.g. abcDEF123... or the full <meta name="google-site-verification" ...> tag'
+                value={form.google_site_verification}
+                onChange={(e) => update('google_site_verification', e.target.value)}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                In Search Console, add a property, choose the "HTML tag" verification method, and
+                paste what it gives you here — then click Verify on the Search Console side.
+              </p>
+            </div>
+            <div>
+              <label className="label">Google Analytics (GA4) Measurement ID</label>
+              <input
+                className="input font-mono text-xs"
+                placeholder="G-XXXXXXXXXX"
+                value={form.ga4_measurement_id}
+                onChange={(e) => update('ga4_measurement_id', e.target.value)}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Found in GA4 under Admin &gt; Data Streams &gt; your web stream.
+              </p>
+            </div>
+            <div>
+              <label className="label">Google Ads Conversion ID</label>
+              <input
+                className="input font-mono text-xs"
+                placeholder="AW-XXXXXXXXX"
+                value={form.google_ads_id}
+                onChange={(e) => update('google_ads_id', e.target.value)}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Found in Google Ads under Tools &amp; Settings &gt; Conversions &gt; your
+                conversion action &gt; Tag setup.
+              </p>
+            </div>
           </div>
         </div>
 
