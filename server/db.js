@@ -277,6 +277,7 @@ const SCHEMA_STATEMENTS = [
     contact_email VARCHAR(255) NOT NULL DEFAULT '',
     contact_phone VARCHAR(50) NOT NULL DEFAULT '',
     contact_address VARCHAR(500) NOT NULL DEFAULT '',
+    contact_response_time VARCHAR(255) NOT NULL DEFAULT '',
     facebook_url VARCHAR(500) NOT NULL DEFAULT '',
     instagram_url VARCHAR(500) NOT NULL DEFAULT '',
     site_logo VARCHAR(500) NOT NULL DEFAULT '',
@@ -427,6 +428,10 @@ async function runColumnMigrations() {
 
   // Destinations & Attractions.
   await ensureColumn('settings', 'sample_destinations_seeded', 'TINYINT(1) NOT NULL DEFAULT 0');
+
+  // Contact page redesign — an admin-editable "response time" line (e.g.
+  // "Within 24 hours") alongside the existing contact_email/phone/address.
+  await ensureColumn('settings', 'contact_response_time', "VARCHAR(255) NOT NULL DEFAULT ''");
 }
 
 // --- One-time migration: server/data.json -> MySQL ---
@@ -1856,7 +1861,7 @@ const settings = {
     await pool.query(
       `UPDATE settings SET consultant_name=?, consultant_title=?, consultant_phone=?, consultant_whatsapp=?,
          consultant_email=?, consultant_photo=?, whatsapp_button_phone=?, notification_email=?, contact_email=?,
-         contact_phone=?, contact_address=?, facebook_url=?, instagram_url=?, site_logo=?, site_favicon=?,
+         contact_phone=?, contact_address=?, contact_response_time=?, facebook_url=?, instagram_url=?, site_logo=?, site_favicon=?,
          google_site_verification=?, ga4_measurement_id=?, google_ads_id=?, noindex_site=?,
          agency_markup_percent=?, customer_markup_percent=? WHERE id = 1`,
       [
@@ -1871,6 +1876,7 @@ const settings = {
         input.contact_email || '',
         input.contact_phone || '',
         input.contact_address || '',
+        input.contact_response_time || '',
         input.facebook_url || '',
         input.instagram_url || '',
         input.site_logo || '',
@@ -1909,8 +1915,8 @@ const PAGE_CONTENT_DEFAULTS = {
     seo_description: '',
   },
   contact: {
-    h1: 'Contact',
-    p: "Questions or special requests? Send us a message and we'll get back to you as soon as possible.",
+    h1: "Let's Plan Your Perfect Tour",
+    p: "Whether you have a question about our tours, need help planning your itinerary, or just want to say hello — we're here for you.",
     seo_title: '',
     seo_description: '',
   },

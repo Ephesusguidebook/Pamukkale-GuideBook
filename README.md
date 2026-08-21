@@ -246,6 +246,14 @@ If you're using the "Node.js Web Application" option:
   Crawlers → crawl errors) with a contact form (Name, Email, Phone, Message) so a lost
   visitor can reach out directly, plus quick links to each Tours type (Package, Daily,
   Activities).
+- **Contact page**: a two-column design — an intro with info cards for Email, WhatsApp/
+  Phone, Location and Response Time (each shown only if its field is filled in), WhatsApp
+  and "Send Email" buttons, and a message form (First/Last Name, Email, Phone, optional
+  Subject, Message) on the right. All four info-card values plus the new "Response Time"
+  line are editable from `/admin/settings` → "Contact Page Info" — no code change needed
+  to update them. The optional Subject field is folded into the top of the saved message
+  (`Subject: ...`) rather than adding a new database column, so it also shows up cleanly
+  under `/admin/messages`.
 - **Google Search Console / Analytics (GA4) / Ads** (`/admin/settings` → "Search Console,
   Analytics & Ads"): paste the verification code Search Console gives you, your GA4
   Measurement ID (`G-...`), and/or your Google Ads Conversion ID (`AW-...`) — you can paste

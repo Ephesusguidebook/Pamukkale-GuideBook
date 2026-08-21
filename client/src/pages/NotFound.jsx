@@ -26,7 +26,7 @@ export default function NotFound() {
         <p className="mx-auto mt-1 max-w-md text-center text-sm text-gray-500">
           Tell us what you were trying to find and we'll help you out.
         </p>
-        <div className="mx-auto mt-6 max-w-md">
+        <div className="card mx-auto mt-6 max-w-md p-6">
           <ContactForm />
         </div>
       </div>

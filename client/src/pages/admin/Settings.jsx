@@ -14,6 +14,7 @@ const empty = {
   contact_email: '',
   contact_phone: '',
   contact_address: '',
+  contact_response_time: '',
   facebook_url: '',
   instagram_url: '',
   site_logo: '',
@@ -210,7 +211,8 @@ export default function Settings() {
         <div className="border-t border-gray-100 pt-4">
           <h2 className="font-semibold text-gray-800">Contact Page Info</h2>
           <p className="mt-1 text-xs text-gray-500">
-            Shown at the top of the Contact page. Leave any field empty to hide it.
+            Shown as info cards at the top of the Contact page. Leave any field empty to hide
+            its card — the WhatsApp / Phone card uses the WhatsApp number set above.
           </p>
           <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
@@ -239,6 +241,15 @@ export default function Settings() {
                 placeholder="Street, City, Country"
                 value={form.contact_address}
                 onChange={(e) => update('contact_address', e.target.value)}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="label">Response Time</label>
+              <input
+                className="input"
+                placeholder="e.g. Within 24 hours"
+                value={form.contact_response_time}
+                onChange={(e) => update('contact_response_time', e.target.value)}
               />
             </div>
           </div>
