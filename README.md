@@ -66,6 +66,11 @@ Departure Point are set on its edit form under Admin > Tours.
   date, capacity, image gallery and day-by-day itinerary can all be set.
 - **Resilient front end:** unexpected render errors are caught by an `ErrorBoundary` so
   visitors never see a blank white screen.
+- **Cost & Pricing** (per tour, in the admin edit screen): configure tiered vehicle costs
+  by party size (e.g. a Vito for up to 5 people, a Sprinter for 6+), other flat fixed costs
+  (e.g. the guide), and customer-selectable optional per-person costs (entrance fees, food,
+  extras). See "Cost & Pricing" below for the full pricing formula and how role-based
+  markup (Admin > Settings) applies.
 - **Not yet included:** online payment / booking (currently just a contact form) — the
   data model is structured so a booking + payment module (e.g. Stripe/iyzico/PayTR) can be
   added later without a rewrite.
@@ -238,12 +243,46 @@ If you're using the "Node.js Web Application" option:
   the same photo can be reused across multiple listings. Files are stored under
   `server/uploads/media/`.
 
+## Cost & Pricing
+
+Each tour's admin edit screen has a "Maliyet ve Fiyatlandırma" (Cost & Pricing) section
+that drives how much a booking will cost later (Faz 3/4 — availability and the booking
+flow — build on top of this):
+
+- **Vehicle tiers** — a fixed cost tiered by party size (e.g. 1-5 people → Vito, 6-12 →
+  Sprinter). Exactly one tier applies per booking, picked automatically by how many people
+  are booking.
+- **Other fixed costs** — flat per-tour costs that don't depend on group size (e.g. the
+  guide).
+- **Optional costs** — per-person items the customer picks themselves at booking time
+  (entrance fees, food, extras), grouped by category.
+
+Role-based markup — set once, site-wide, in Admin > Settings — applies **only** to the
+vehicle tier + other fixed costs, never to optional items:
+
+```
+Ödenecek Fiyat = (Sabit Maliyetler × (1 + Rol Bazlı Kâr Oranı)) + Seçilen İsteğe Bağlı Kalemler
+```
+
+The Cost & Pricing editor includes a live preview (party size, role, which optional items
+are selected) so you can verify the total before saving — it uses the exact same formula
+`server/lib/pricing.js` uses server-side (mirrored client-side in
+`client/src/lib/pricing.js` purely so the preview updates instantly, with no server
+round-trip).
+
 ## Demo Content
 
-`server/scripts/seed.js` publishes 6 Package Tours, 6 Daily Tours and 6 Activities (18
-tours total, all under `/tours`, tagged with their Type) plus 6 Blog posts with realistic
-placeholder text and photos, so you can see the full site design populated. Run it against
-your own deployment:
+On first startup against a database with no tours yet, the server automatically publishes
+3 sample tours (one Package, one Daily, one Activity — titles end with "(Örnek İçerik)"),
+fully filled in including Cost & Pricing, so you have something real to click through and
+review right after deploying, with zero setup. This only ever happens once: it's guarded
+by a permanent flag, not by whether the sample tours still exist, so once you delete them
+from Admin > Tours (once you start entering your real tours), they will not come back — not
+even after a future update.
+
+For a larger, more visual demo (18 tours across all three types plus 6 blog posts, with
+placeholder photos), `server/scripts/seed.js` is available as an optional manual step —
+run it from any machine with Node.js and network access to your deployed site:
 
 ```bash
 SITE_URL=https://pamukkaleguidebook.com ADMIN_EMAIL=you@example.com ADMIN_PASSWORD=yourpassword \
@@ -254,10 +293,22 @@ Titles end with "(demo)" so they're easy to find and delete later from the admin
 
 ## What's Next
 
-- Add a payment/booking flow when you're ready (you'll need to pick a payment provider —
-  Stripe, iyzico and PayTR are common choices). The move to MySQL (see above) was the
-  groundwork for this: booking and per-date availability need real transactional
-  guarantees a JSON file can't provide, so that the last seat on a tour can never be
-  double-booked by two people at once.
-- Tour categories, coupon codes and further content types can be layered on top of this
-  structure fairly easily.
+Roadmap towards a full booking platform (Cost & Pricing above is the first piece):
+
+- **Availability** — a calendar per tour (Package/Daily) with Guaranteed / On Request /
+  Closed status per date.
+- **Booking flow** — customers pick a date and party size and complete a full (payment-free)
+  reservation; an automatic email ticket is sent on confirmation.
+- **Transfer product type** — routes with their own availability, alongside Package/Daily/
+  Activity.
+- **Agency Panel** — a separate login for travel agencies, seeing agency-role pricing
+  (lower markup) instead of the public customer price.
+
+An eventual payment/booking flow (you'll pick a provider — Stripe, iyzico and PayTR are
+common choices) can be layered on top once the above is in place. The move to MySQL (see
+above) was the groundwork for all of this: booking and per-date availability need real
+transactional guarantees a JSON file can't provide, so that the last seat on a tour can
+never be double-booked by two people at once.
+
+Tour categories, coupon codes and further content types can be layered on top of this
+structure fairly easily.

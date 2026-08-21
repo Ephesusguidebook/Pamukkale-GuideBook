@@ -83,6 +83,9 @@ const SCHEMA_STATEMENTS = [
     images JSON,
     itinerary JSON,
     route JSON,
+    vehicle_tiers JSON,
+    fixed_costs JSON,
+    optional_costs JSON,
     seo_title VARCHAR(255) NOT NULL DEFAULT '',
     seo_description VARCHAR(500) NOT NULL DEFAULT '',
     created_at VARCHAR(40) NOT NULL,
@@ -198,7 +201,10 @@ const SCHEMA_STATEMENTS = [
     google_site_verification VARCHAR(255) NOT NULL DEFAULT '',
     ga4_measurement_id VARCHAR(50) NOT NULL DEFAULT '',
     google_ads_id VARCHAR(50) NOT NULL DEFAULT '',
-    noindex_site TINYINT(1) NOT NULL DEFAULT 1
+    noindex_site TINYINT(1) NOT NULL DEFAULT 1,
+    agency_markup_percent DECIMAL(6,2) NOT NULL DEFAULT 10,
+    customer_markup_percent DECIMAL(6,2) NOT NULL DEFAULT 20,
+    sample_content_seeded TINYINT(1) NOT NULL DEFAULT 0
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 
   `CREATE TABLE IF NOT EXISTS page_content (
@@ -214,6 +220,32 @@ async function createSchema() {
   for (const stmt of SCHEMA_STATEMENTS) {
     await query(stmt);
   }
+}
+
+// --- Additive column migrations ---
+// A brand-new install gets every column straight from SCHEMA_STATEMENTS
+// above (CREATE TABLE IF NOT EXISTS never touches a table that already
+// exists), so whenever a later update needs a new column on an existing
+// live table, it has to be added here instead — checked against
+// information_schema first so this is safe to run on every startup
+// (no-op once the column is already there) on both MySQL and MariaDB.
+async function ensureColumn(table, column, definition) {
+  const rows = await query(
+    'SELECT COUNT(*) AS c FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?',
+    [table, column]
+  );
+  if (Number(rows[0].c) > 0) return;
+  await query(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+}
+
+async function runColumnMigrations() {
+  // Faz 2 — cost & pricing screen (added after the initial MySQL launch).
+  await ensureColumn('tours', 'vehicle_tiers', 'JSON NULL');
+  await ensureColumn('tours', 'fixed_costs', 'JSON NULL');
+  await ensureColumn('tours', 'optional_costs', 'JSON NULL');
+  await ensureColumn('settings', 'agency_markup_percent', "DECIMAL(6,2) NOT NULL DEFAULT 10");
+  await ensureColumn('settings', 'customer_markup_percent', "DECIMAL(6,2) NOT NULL DEFAULT 20");
+  await ensureColumn('settings', 'sample_content_seeded', 'TINYINT(1) NOT NULL DEFAULT 0');
 }
 
 // --- One-time migration: server/data.json -> MySQL ---
@@ -541,6 +573,47 @@ function normalizeRoute(route) {
     .filter((p) => p.name && Number.isFinite(p.lat) && Number.isFinite(p.lng));
 }
 
+// --- Cost & Pricing (Faz 2) ---
+// Sabit Maliyetler (fixed costs) = vehicle_tiers (one tier selected by party
+// size — e.g. Vito for up to 5 people, Sprinter for 6+) + fixed_costs (flat
+// per-tour items, e.g. the guide). Role-based markup (see settings.
+// agency_markup_percent / customer_markup_percent) applies ONLY to this
+// fixed total. optional_costs (entrance fees, food, extras — normally
+// per-person) are customer-selectable at booking time and are always
+// charged at raw cost, with no markup. See server/lib/pricing.js for the
+// actual price calculation, mirrored client-side in client/src/lib/pricing.js
+// for the live admin preview.
+const OPTIONAL_COST_CATEGORIES = ['entrance', 'food', 'extra', 'other'];
+function normalizeVehicleTiers(tiers) {
+  return (tiers || [])
+    .map((t, idx) => ({
+      id: idx + 1,
+      min_people: Math.max(1, Number(t.min_people) || 1),
+      max_people: t.max_people === '' || t.max_people === null || t.max_people === undefined ? null : Math.max(1, Number(t.max_people) || 1),
+      vehicle_name: t.vehicle_name || '',
+      cost: Number(t.cost) || 0,
+      sort_order: idx,
+    }))
+    .filter((t) => t.vehicle_name)
+    .sort((a, b) => a.min_people - b.min_people);
+}
+function normalizeFixedCosts(items) {
+  return (items || [])
+    .map((c, idx) => ({ id: idx + 1, name: c.name || '', cost: Number(c.cost) || 0, sort_order: idx }))
+    .filter((c) => c.name);
+}
+function normalizeOptionalCosts(items) {
+  return (items || [])
+    .map((c, idx) => ({
+      id: idx + 1,
+      name: c.name || '',
+      cost_per_person: Number(c.cost_per_person) || 0,
+      category: OPTIONAL_COST_CATEGORIES.includes(c.category) ? c.category : 'other',
+      sort_order: idx,
+    }))
+    .filter((c) => c.name);
+}
+
 function rowToTour(row) {
   if (!row) return row;
   return { ...row, price: Number(row.price), original_price: Number(row.original_price) };
@@ -572,9 +645,10 @@ const tours = {
     const [result] = await pool.query(
       `INSERT INTO tours (slug, type, departure_point, title, summary, description, price, original_price,
          price_note, currency, duration_days, location, start_date, capacity, status, cover_image,
-         languages, highlights, included, excluded, images, itinerary, route, seo_title, seo_description,
+         languages, highlights, included, excluded, images, itinerary, route,
+         vehicle_tiers, fixed_costs, optional_costs, seo_title, seo_description,
          created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         input.slug,
         TOUR_TYPES.includes(input.type) ? input.type : 'package',
@@ -599,6 +673,9 @@ const tours = {
         j(normalizeImages(input.images)),
         j(normalizeItinerary(input.itinerary)),
         j(normalizeRoute(input.route)),
+        j(normalizeVehicleTiers(input.vehicle_tiers)),
+        j(normalizeFixedCosts(input.fixed_costs)),
+        j(normalizeOptionalCosts(input.optional_costs)),
         input.seo_title || '',
         input.seo_description || '',
         now,
@@ -614,7 +691,8 @@ const tours = {
       `UPDATE tours SET slug = ?, type = ?, departure_point = ?, title = ?, summary = ?, description = ?,
          price = ?, original_price = ?, price_note = ?, currency = ?, duration_days = ?, location = ?,
          start_date = ?, capacity = ?, status = ?, cover_image = ?, languages = ?, highlights = ?,
-         included = ?, excluded = ?, images = ?, itinerary = ?, route = ?, seo_title = ?,
+         included = ?, excluded = ?, images = ?, itinerary = ?, route = ?,
+         vehicle_tiers = ?, fixed_costs = ?, optional_costs = ?, seo_title = ?,
          seo_description = ?, updated_at = ? WHERE id = ?`,
       [
         input.slug || existing.slug,
@@ -640,6 +718,9 @@ const tours = {
         j(normalizeImages(input.images)),
         j(normalizeItinerary(input.itinerary)),
         j(normalizeRoute(input.route)),
+        j(normalizeVehicleTiers(input.vehicle_tiers)),
+        j(normalizeFixedCosts(input.fixed_costs)),
+        j(normalizeOptionalCosts(input.optional_costs)),
         input.seo_title || '',
         input.seo_description || '',
         nowIso(),
@@ -867,8 +948,13 @@ function extractPrefixedId(raw, prefix) {
 }
 
 function rowToSettings(row) {
-  const { id, noindex_site, ...rest } = row;
-  return { ...rest, noindex_site: !!noindex_site };
+  const { id, noindex_site, sample_content_seeded, agency_markup_percent, customer_markup_percent, ...rest } = row;
+  return {
+    ...rest,
+    noindex_site: !!noindex_site,
+    agency_markup_percent: Number(agency_markup_percent),
+    customer_markup_percent: Number(customer_markup_percent),
+  };
 }
 
 const settings = {
@@ -886,7 +972,8 @@ const settings = {
       `UPDATE settings SET consultant_name=?, consultant_title=?, consultant_phone=?, consultant_whatsapp=?,
          consultant_email=?, consultant_photo=?, whatsapp_button_phone=?, notification_email=?, contact_email=?,
          contact_phone=?, contact_address=?, facebook_url=?, instagram_url=?, site_logo=?, site_favicon=?,
-         google_site_verification=?, ga4_measurement_id=?, google_ads_id=?, noindex_site=? WHERE id = 1`,
+         google_site_verification=?, ga4_measurement_id=?, google_ads_id=?, noindex_site=?,
+         agency_markup_percent=?, customer_markup_percent=? WHERE id = 1`,
       [
         input.consultant_name || '',
         input.consultant_title || '',
@@ -907,6 +994,8 @@ const settings = {
         extractPrefixedId(input.ga4_measurement_id, 'G'),
         extractPrefixedId(input.google_ads_id, 'AW'),
         input.noindex_site ? 1 : 0,
+        Number(input.agency_markup_percent) || 0,
+        Number(input.customer_markup_percent) || 0,
       ]
     );
     return settings.get();
@@ -1239,11 +1328,158 @@ const siteFiles = {
 // creates the schema if it doesn't exist yet, imports data.json on a
 // first-ever run against a fresh database, and makes sure the configured
 // admin account exists.
+// --- One-time sample/preview content seed ---
+// Fills the site with a few example tours (covering all three types, and
+// demonstrating the new Faz 2 cost/pricing fields) so the owner can preview
+// pages and spot issues before entering real data. Guarded by
+// settings.sample_content_seeded (a permanent flag on the single settings
+// row, NOT by whether the sample tours still exist) specifically so that
+// deleting these tours from Admin > Tours later — once real data is being
+// entered — is final: they will never be silently recreated by a later
+// deploy/restart.
+async function seedSampleContentIfNeeded() {
+  await settings.get(); // ensures the settings row exists
+  const rows = await query('SELECT sample_content_seeded FROM settings WHERE id = 1 LIMIT 1');
+  if (rows[0] && Number(rows[0].sample_content_seeded) > 0) return;
+
+  const sampleTours = [
+    {
+      title: 'Efes Antik Kenti Turu (Örnek İçerik)',
+      type: 'daily',
+      departure_point: 'Kuşadası',
+      summary: 'Efes Antik Kenti, Meryem Ana Evi ve Şirince köyünü kapsayan özel günübirlik tur.',
+      description:
+        'Bu bir örnek/önizleme içeriğidir — gerçek verilerinizi girmeye başladığınızda Admin > Turlar üzerinden silebilirsiniz, tekrar oluşturulmaz.\n\n' +
+        'Efes Antik Kenti, dünyanın en iyi korunmuş antik kentlerinden biridir. Bu özel (private) turda Celsus Kütüphanesi, Büyük Tiyatro ve Aşkı Yolu\'nu profesyonel rehberiniz eşliğinde gezersiniz.',
+      price: 215,
+      original_price: 0,
+      price_note: '1 kişi için örnek fiyat — Maliyet ve Fiyatlandırma sekmesinden hesaplanır',
+      currency: 'EUR',
+      duration_days: 1,
+      location: 'Efes / Selçuk',
+      start_date: '',
+      capacity: 16,
+      status: 'published',
+      languages: ['TR', 'EN'],
+      highlights: ['Efes Antik Kenti', 'Meryem Ana Evi', 'Şirince Köyü'],
+      included: ['Profesyonel Rehber', 'Ulaşım (Araç)'],
+      excluded: ['Giriş Ücretleri (isteğe bağlı olarak eklenebilir)', 'Öğle Yemeği (isteğe bağlı olarak eklenebilir)'],
+      images: [],
+      itinerary: [
+        { day_number: 1, title: 'Efes Antik Kenti ve Çevresi', details: 'Otelden alış, Efes Antik Kenti, Meryem Ana Evi, Şirince köyü ve otele dönüş.' },
+      ],
+      route: [],
+      vehicle_tiers: [
+        { min_people: 1, max_people: 5, vehicle_name: 'Vito', cost: 100 },
+        { min_people: 6, max_people: 16, vehicle_name: 'Sprinter', cost: 150 },
+      ],
+      fixed_costs: [{ name: 'Rehber', cost: 100 }],
+      optional_costs: [
+        { name: 'Yemek', cost_per_person: 10, category: 'food' },
+        { name: 'Efes Giriş', cost_per_person: 5, category: 'entrance' },
+      ],
+      seo_title: '',
+      seo_description: '',
+    },
+    {
+      title: 'Kapadokya ve Pamukkale Turu - 3 Gün (Örnek İçerik)',
+      type: 'package',
+      departure_point: 'Pamukkale',
+      summary: 'Kapadokya\'nın peri bacaları ve Pamukkale\'nin travertenlerini birleştiren 3 günlük paket tur.',
+      description:
+        'Bu bir örnek/önizleme içeriğidir — gerçek verilerinizi girmeye başladığınızda Admin > Turlar üzerinden silebilirsiniz, tekrar oluşturulmaz.\n\n' +
+        'Türkiye\'nin en ikonik iki destinasyonunu bir arada keşfedin: Kapadokya\'nın eşsiz peri bacaları ve balon turu imkanı, Pamukkale\'nin bembeyaz travertenleri ve antik Hierapolis kenti.',
+      price: 450,
+      original_price: 520,
+      price_note: 'Kişi başı, çift kişilik oda esaslı',
+      currency: 'EUR',
+      duration_days: 3,
+      location: 'Kapadokya / Pamukkale',
+      start_date: '',
+      capacity: 16,
+      status: 'published',
+      languages: ['TR', 'EN', 'DE'],
+      highlights: ['Kapadokya Peri Bacaları', 'Pamukkale Travertenleri', 'Hierapolis Antik Kenti'],
+      included: ['Profesyonel Rehber', 'Ulaşım (Araç)', 'Konaklama (2 gece)'],
+      excluded: ['Balon Turu (isteğe bağlı olarak eklenebilir)', 'Öğle Yemekleri (isteğe bağlı olarak eklenebilir)'],
+      images: [],
+      itinerary: [
+        { day_number: 1, title: 'Kapadokya\'ya Varış', details: 'Karşılama, otele yerleşme, Ürgüp ve Göreme çevresinde şehir turu.' },
+        { day_number: 2, title: 'Kapadokya Turu', details: 'İsteğe bağlı balon turu (gün doğumu), Yeraltı Şehri, Peri Bacaları vadi turları.' },
+        { day_number: 3, title: 'Pamukkale\'ye Geçiş', details: 'Pamukkale travertenleri ve Hierapolis Antik Kenti ziyareti.' },
+      ],
+      route: [],
+      vehicle_tiers: [
+        { min_people: 1, max_people: 5, vehicle_name: 'Vito', cost: 300 },
+        { min_people: 6, max_people: 16, vehicle_name: 'Sprinter', cost: 450 },
+      ],
+      fixed_costs: [{ name: 'Rehber (3 Gün)', cost: 250 }],
+      optional_costs: [
+        { name: 'Balon Turu', cost_per_person: 180, category: 'extra' },
+        { name: 'Öğle Yemeği (günlük)', cost_per_person: 15, category: 'food' },
+        { name: 'Hierapolis Giriş', cost_per_person: 20, category: 'entrance' },
+      ],
+      seo_title: '',
+      seo_description: '',
+    },
+    {
+      title: 'Pamukkale Termal Havuzları ve Cleopatra Havuzu (Örnek İçerik)',
+      type: 'activity',
+      departure_point: 'Pamukkale',
+      summary: 'Beyaz travertenler üzerinde yürüyüş ve Cleopatra\'nın antik termal havuzunda yüzme imkanı.',
+      description:
+        'Bu bir örnek/önizleme içeriğidir — gerçek verilerinizi girmeye başladığınızda Admin > Turlar üzerinden silebilirsiniz, tekrar oluşturulmaz.\n\n' +
+        'Pamukkale\'nin ünlü beyaz travertenlerinde yürüyüş yapın ve isteğe bağlı olarak Cleopatra Havuzu\'nda tarihi bir deneyim yaşayın.',
+      price: 35,
+      original_price: 0,
+      price_note: 'Kişi başı',
+      currency: 'EUR',
+      duration_days: 1,
+      location: 'Pamukkale',
+      start_date: '',
+      capacity: 20,
+      status: 'published',
+      languages: ['TR', 'EN'],
+      highlights: ['Pamukkale Travertenleri', 'Cleopatra Havuzu'],
+      included: ['Rehber Eşliğinde Gezi'],
+      excluded: ['Pamukkale Giriş Ücreti (isteğe bağlı olarak eklenebilir)', 'Cleopatra Havuzu Girişi (isteğe bağlı olarak eklenebilir)'],
+      images: [],
+      itinerary: [],
+      route: [],
+      vehicle_tiers: [{ min_people: 1, max_people: 20, vehicle_name: 'Minibüs', cost: 80 }],
+      fixed_costs: [{ name: 'Rehber', cost: 60 }],
+      optional_costs: [
+        { name: 'Pamukkale Giriş', cost_per_person: 5, category: 'entrance' },
+        { name: 'Cleopatra Havuzu Girişi', cost_per_person: 12, category: 'entrance' },
+      ],
+      seo_title: '',
+      seo_description: '',
+    },
+  ];
+
+  for (const t of sampleTours) {
+    const rawSlug = slugify(t.title, { lower: true, strict: true });
+    let slug = isReservedTourSlug(rawSlug) ? `tour-${rawSlug}` : rawSlug;
+    let i = 2;
+    while ((await tours.slugExists(slug)) || isReservedTourSlug(slug)) {
+      slug = `${rawSlug}-${i++}`;
+    }
+    await tours.create({ ...t, slug });
+  }
+
+  await pool.query('UPDATE settings SET sample_content_seeded = 1 WHERE id = 1');
+  console.log(
+    `[db] Seeded ${sampleTours.length} sample preview tour(s). Delete them from Admin > Tours whenever you like — they will not be recreated.`
+  );
+}
+
 async function init() {
   await pool.query('SELECT 1'); // fail fast with a clear error if DB_* is wrong
   await createSchema();
+  await runColumnMigrations();
   await migrateFromJsonIfNeeded();
   await ensureAdminUser();
+  await seedSampleContentIfNeeded();
 }
 
 module.exports = {

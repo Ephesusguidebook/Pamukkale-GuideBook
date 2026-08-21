@@ -4,6 +4,7 @@ import api from '../../api';
 import MediaField from '../../components/MediaField';
 import ItineraryEditor from '../../components/ItineraryEditor';
 import RouteEditor from '../../components/RouteEditor';
+import CostPricingEditor from '../../components/CostPricingEditor';
 import { TOUR_TYPES } from '../../lib/tourRouting';
 
 const emptyItem = {
@@ -28,6 +29,9 @@ const emptyItem = {
   images: [],
   itinerary: [],
   route: [],
+  vehicle_tiers: [],
+  fixed_costs: [],
+  optional_costs: [],
   seo_title: '',
   seo_description: '',
 };
@@ -74,6 +78,9 @@ export default function AdminCategoryForm({ category }) {
           images: t.images || [],
           itinerary: t.itinerary || [],
           route: t.route || [],
+          vehicle_tiers: t.vehicle_tiers || [],
+          fixed_costs: t.fixed_costs || [],
+          optional_costs: t.optional_costs || [],
           languages: t.languages || [],
           highlights: t.highlights || [],
           included: t.included || [],
@@ -349,6 +356,23 @@ export default function AdminCategoryForm({ category }) {
         <div className="card space-y-3 p-6">
           <h2 className="font-semibold text-gray-800">Route (Map)</h2>
           <RouteEditor points={form.route} onChange={(pts) => update('route', pts)} />
+        </div>
+
+        <div className="card space-y-3 p-6">
+          <h2 className="font-semibold text-gray-800">Maliyet ve Fiyatlandırma</h2>
+          <p className="text-xs text-gray-500">
+            Bu turun rezervasyon fiyatının nasıl hesaplanacağını buradan yapılandırın — araç ve diğer
+            sabit maliyetlere rol bazlı kâr oranı uygulanır, isteğe bağlı kalemler ham maliyetiyle
+            eklenir.
+          </p>
+          <CostPricingEditor
+            vehicleTiers={form.vehicle_tiers}
+            fixedCosts={form.fixed_costs}
+            optionalCosts={form.optional_costs}
+            onChangeVehicleTiers={(v) => update('vehicle_tiers', v)}
+            onChangeFixedCosts={(v) => update('fixed_costs', v)}
+            onChangeOptionalCosts={(v) => update('optional_costs', v)}
+          />
         </div>
 
         <div className="card space-y-4 p-6">

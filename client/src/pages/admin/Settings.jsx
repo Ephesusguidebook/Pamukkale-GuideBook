@@ -22,6 +22,8 @@ const empty = {
   ga4_measurement_id: '',
   google_ads_id: '',
   noindex_site: true,
+  agency_markup_percent: 10,
+  customer_markup_percent: 20,
 };
 
 export default function Settings() {
@@ -286,6 +288,39 @@ export default function Settings() {
               value={form.notification_email}
               onChange={(e) => update('notification_email', e.target.value)}
             />
+          </div>
+        </div>
+
+        <div className="border-t border-gray-100 pt-4">
+          <h2 className="font-semibold text-gray-800">Rol Bazlı Kâr Oranı (Karlandırma)</h2>
+          <p className="mt-1 text-xs text-gray-500">
+            Her turun Maliyet ve Fiyatlandırma ekranında girilen sabit maliyetlere (araç + diğer sabit
+            kalemler) uygulanacak kâr oranı. İsteğe bağlı kalemlere (giriş, yemek, ekstra) kâr
+            eklenmez — ham maliyetiyle yansır.
+          </p>
+          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="label">Müşteri Kâr Oranı (%)</label>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                className="input"
+                value={form.customer_markup_percent}
+                onChange={(e) => update('customer_markup_percent', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="label">Acente Kâr Oranı (%)</label>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                className="input"
+                value={form.agency_markup_percent}
+                onChange={(e) => update('agency_markup_percent', e.target.value)}
+              />
+            </div>
           </div>
         </div>
 
