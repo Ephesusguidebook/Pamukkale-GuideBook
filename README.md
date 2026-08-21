@@ -58,8 +58,8 @@ Departure Point are set on its edit form under Admin > Tours.
 - **Front end:** Home page, a unified Tours section (Package Tours, Daily Tours and
   Activities, filterable by type and by departure point), a Blog, and static About Us /
   Terms and Conditions / Privacy Policy pages. Every tour detail page has a gallery,
-  day-by-day itinerary, map route, and a contact form that ties enquiries back to the
-  specific listing.
+  day-by-day itinerary, map route, and a 3-step booking widget that ties enquiries back to
+  the specific listing (see "Tours Booking" below).
 - **Admin panel** (`/admin/login`): log in and add/edit/delete Tours (tagged Package/Daily/
   Activity, with an optional Departure Point) and Blog Posts from one screen each. For
   tours: title, summary, full description, price, currency, duration, location, start
@@ -71,6 +71,12 @@ Departure Point are set on its edit form under Admin > Tours.
   (e.g. the guide), and customer-selectable optional per-person costs (entrance fees, food,
   extras). See "Cost & Pricing" below for the full pricing formula and how role-based
   markup (Admin > Settings) applies.
+- **Tours Booking — Private / Small Group** (`/tours/:slug`): every tour is Private (priced
+  live via Cost & Pricing above) or Small Group (one flat guaranteed-departure price, no
+  markup). A per-tour Availability calendar and a 3-step public booking widget (date +
+  guests → customise with optional add-ons and a live price breakdown → contact + pick-up
+  details) replace the old static price card. See "Tours Booking" below for the full
+  breakdown.
 - **Transfer** (`/transfer`): a separate product type for private point-to-point transfers
   (e.g. airport pickups). Admin manages Routes (pick-up/drop-off, duration, the same Cost &
   Pricing model as Tours) and a per-route Availability calendar (Available / On Request /
@@ -79,11 +85,10 @@ Departure Point are set on its edit form under Admin > Tours.
   Round Trip, optional extras) that computes the price live, and submit a reservation
   request — same as tours, this goes to Admin > Messages as an enquiry (see "Not yet
   included" below) rather than an online payment.
-- **Not yet included:** online payment / booking (currently just a contact form for Tours,
-  and a reservation-request form pre-filled with the full booking selection for Transfer) —
-  the
-  data model is structured so a booking + payment module (e.g. Stripe/iyzico/PayTR) can be
-  added later without a rewrite.
+- **Not yet included:** online payment / real booking inventory (currently both Tours and
+  Transfer submit a booking request pre-filled with the full selection as a contact-message
+  enquiry, landing in Admin > Messages) — the data model is structured so a booking +
+  payment module (e.g. Stripe/iyzico/PayTR) can be added later without a rewrite.
 
 ## Local Development
 
@@ -281,6 +286,43 @@ are selected) so you can verify the total before saving — it uses the exact sa
 `client/src/lib/pricing.js` purely so the preview updates instantly, with no server
 round-trip).
 
+## Tours Booking (Private / Small Group)
+
+Every tour is one of two booking types, set on its admin edit screen ("Booking Type"
+section, above Cost & Pricing):
+
+- **Private** (default) — priced exactly like Transfer: the Cost & Pricing vehicle
+  tiers + other fixed costs + role-based markup formula, picked automatically by party
+  size.
+- **Small Group** — a guaranteed-departure tour with one flat per-person price (the
+  tour's own "Price" field) × guest count, with **no markup at all**. Guests simply join
+  one of the existing scheduled departures instead of getting a dedicated
+  vehicle/guide — so the Cost & Pricing screen hides the vehicle-tier and other-fixed-cost
+  sections for these tours (only the optional per-person add-ons editor still applies).
+  The formula lives in `calculateSmallGroupPrice()` in `server/lib/pricing.js`, mirrored
+  in `client/src/lib/pricing.js` for the instant preview, the same "keep in sync" pattern
+  as `calculateTourPrice()`.
+
+Every tour also gets its own **Availability** calendar on the admin edit screen
+(Available / On Request / Closed per date, defaulting to Available) — the exact same
+generic `availability` table and `AvailabilityCalendar` component Transfer Routes use,
+just attached to Tours as well now (`item_type = 'tour'`).
+
+On the public tour page, the old static price card + contact form is replaced by a
+3-step booking widget (`TourBookingWidget`):
+
+1. **Select Date & Guests** — pick a date from the availability calendar (closed dates
+   aren't selectable) and a guest count.
+2. **Customise Your Tour** — see what's included (the vehicle + fixed-cost items for
+   Private tours, or the tour's `included` list for Small Group), toggle optional
+   per-person add-ons, and watch the price breakdown update live.
+3. **Complete Your Booking** — a summary (tour, date, guests, total), then First/Last
+   Name, Email, Phone, Pick-up Location (hotel/port/etc.) and Special Requests.
+
+Like Transfer, there's no online payment yet, so "Send Booking Request" submits the
+full selection as a composed enquiry through the same contact-message system (Admin >
+Messages) — see "Booking flow" under What's Next below for what comes after this.
+
 ## Transfer
 
 A second, separate product type at `/transfer` for private point-to-point transfers (e.g.
@@ -309,14 +351,18 @@ airport pickups), alongside Tours:
 ## Demo Content
 
 On first startup against a database with no tours yet, the server automatically publishes
-3 sample tours (one Package, one Daily, one Activity — titles end with "(Örnek İçerik)"),
-fully filled in including Cost & Pricing, plus 2 sample Transfer Routes (also "(Örnek
-İçerik)", including a few sample availability dates), so you have something real to click
-through and review right after deploying, with zero setup. This only ever happens once
-per content type: each is guarded by its own permanent flag, not by whether the sample
-items still exist, so once you delete them from Admin > Tours / Admin > Transfers (once
-you start entering your real content), they will not come back — not even after a future
-update.
+3 sample Private tours (one Package, one Daily, one Activity — titles end with "(Örnek
+İçerik)"), fully filled in including Cost & Pricing, plus 1 sample Small Group tour and 2
+sample Transfer Routes (also "(Örnek İçerik)", including a few sample availability
+dates), so you have something real to click through and review right after deploying,
+with zero setup. This only ever happens once per content type: each batch is guarded by
+its own permanent flag (`sample_content_seeded`, `sample_small_group_seeded`,
+`sample_transfer_seeded`), not by whether the sample items still exist, so once you
+delete them from Admin > Tours / Admin > Transfers (once you start entering your real
+content), they will not come back — not even after a future update. This per-batch
+flagging is also why a future update can safely add a new sample batch without
+re-seeding content you've already deleted: an update that adds sample content always
+gets its own new flag, never reuses one from a previous batch.
 
 For a larger, more visual demo (18 tours across all three types plus 6 blog posts, with
 placeholder photos), `server/scripts/seed.js` is available as an optional manual step —
@@ -331,16 +377,20 @@ Titles end with "(demo)" so they're easy to find and delete later from the admin
 
 ## What's Next
 
-Roadmap towards a full booking platform (Cost & Pricing and Transfer above are the first
-pieces):
+Roadmap towards a full booking platform (Cost & Pricing, Transfer, and Tours Booking
+above are the first pieces):
 
-- **Availability for Tours** — the `availability` table added for Transfer Routes is
-  generic (keyed by item type + item id), so extending the same calendar to Package/Daily
-  tours is mostly admin/public UI work, not a new data model.
-- **Booking flow** — customers pick a date and party size and complete a full (payment-free)
-  reservation; an automatic email ticket is sent on confirmation. Transfer's reservation
-  request (a contact message with the full selection attached) is the interim step this
-  builds on.
+- **Booking flow** — right now, "Send Booking Request" / "Send Reservation Request" on
+  both Tours and Transfer submit a composed enquiry through the contact-message system
+  (Admin > Messages) — there's no real seat/date inventory or online payment yet, so two
+  customers could both request the same date and both need manual confirmation. A real
+  booking flow would reserve the date the moment a request comes in (using the existing
+  `availability` table), take payment, and send an automatic email ticket on
+  confirmation.
+- **Small Group departure capacity** — Small Group tours currently have unlimited
+  guests per date; a real "guaranteed departure, guests join one of 2 existing groups"
+  model needs a capacity/headcount concept per date, not just Available/On
+  Request/Closed.
 - **Agency Panel** — a separate login for travel agencies, seeing agency-role pricing
   (lower markup) instead of the public customer price.
 

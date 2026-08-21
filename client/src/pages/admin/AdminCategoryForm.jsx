@@ -5,6 +5,7 @@ import MediaField from '../../components/MediaField';
 import ItineraryEditor from '../../components/ItineraryEditor';
 import RouteEditor from '../../components/RouteEditor';
 import CostPricingEditor from '../../components/CostPricingEditor';
+import AvailabilityCalendar from '../../components/AvailabilityCalendar';
 import { TOUR_TYPES } from '../../lib/tourRouting';
 
 const emptyItem = {
@@ -32,6 +33,9 @@ const emptyItem = {
   vehicle_tiers: [],
   fixed_costs: [],
   optional_costs: [],
+  // Faz 3 — Private (cost/pricing engine, per-passenger vehicle+markup) or
+  // Small Group (flat guaranteed-departure price, no markup).
+  booking_type: 'private',
   seo_title: '',
   seo_description: '',
 };
@@ -58,6 +62,7 @@ export default function AdminCategoryForm({ category }) {
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [availabilityMap, setAvailabilityMap] = useState({});
 
   useEffect(() => {
     setForm(emptyItem);
@@ -81,6 +86,7 @@ export default function AdminCategoryForm({ category }) {
           vehicle_tiers: t.vehicle_tiers || [],
           fixed_costs: t.fixed_costs || [],
           optional_costs: t.optional_costs || [],
+          booking_type: t.booking_type === 'small_group' ? 'small_group' : 'private',
           languages: t.languages || [],
           highlights: t.highlights || [],
           included: t.included || [],
@@ -93,8 +99,32 @@ export default function AdminCategoryForm({ category }) {
       .finally(() => setLoading(false));
   }, [id, isEdit, category.adminApiBase, category.label]);
 
+  useEffect(() => {
+    if (!isEdit) return;
+    api
+      .get(`${category.adminApiBase}/${id}/availability`)
+      .then((res) => setAvailabilityMap(res.data))
+      .catch(() => {});
+  }, [id, isEdit, category.adminApiBase]);
+
   function update(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
+  }
+
+  async function handleAvailabilityChange(date, status) {
+    // Optimistic update, same pattern as Transfer's admin form.
+    setAvailabilityMap((m) => {
+      const next = { ...m };
+      if (status === 'available') delete next[date];
+      else next[date] = status;
+      return next;
+    });
+    if (!isEdit) return; // new/unsaved tour — availability can only be set after it has an id
+    try {
+      await api.put(`${category.adminApiBase}/${id}/availability`, { date, status });
+    } catch {
+      alert('Could not save availability for that date.');
+    }
   }
 
   async function handleSubmit(e, statusOverride) {
@@ -111,12 +141,16 @@ export default function AdminCategoryForm({ category }) {
         status: statusOverride || form.status,
         cover_image: form.images[0]?.url || '',
       };
+      let saved;
       if (isEdit) {
-        await api.put(`${category.adminApiBase}/${id}`, payload);
+        saved = (await api.put(`${category.adminApiBase}/${id}`, payload)).data;
       } else {
-        await api.post(category.adminApiBase, payload);
+        saved = (await api.post(category.adminApiBase, payload)).data;
       }
-      navigate(category.adminPath);
+      // Stay on the (now-edit) form after a create, same as Transfer's admin
+      // form — the tour needs a saved id before its availability calendar
+      // can be used.
+      navigate(`${category.adminPath}/${saved.id}`, { replace: true });
     } catch (err) {
       setError(err.response?.data?.error || 'Something went wrong while saving.');
     } finally {
@@ -207,6 +241,46 @@ export default function AdminCategoryForm({ category }) {
                 )
               }
             />
+          </div>
+        </div>
+
+        <div className="card space-y-4 p-6">
+          <h2 className="font-semibold text-gray-800">Booking Type</h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label
+              className={`cursor-pointer rounded-lg border p-3 text-sm ${form.booking_type === 'private' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'}`}
+            >
+              <div className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="booking_type"
+                  checked={form.booking_type === 'private'}
+                  onChange={() => update('booking_type', 'private')}
+                />
+                <span className="font-semibold text-gray-800">Private</span>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Fiyat, aşağıdaki Maliyet ve Fiyatlandırma bölümünde tanımlanan araç/sabit maliyetler ve
+                rol bazlı kâr oranıyla hesaplanır.
+              </p>
+            </label>
+            <label
+              className={`cursor-pointer rounded-lg border p-3 text-sm ${form.booking_type === 'small_group' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'}`}
+            >
+              <div className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="booking_type"
+                  checked={form.booking_type === 'small_group'}
+                  onChange={() => update('booking_type', 'small_group')}
+                />
+                <span className="font-semibold text-gray-800">Small Group</span>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Garanti kalkışlı tur. Misafirler var olan gruba dahil edilir, sabit kişi başı fiyat
+                (aşağıdaki "Price") × kişi sayısı uygulanır, kâr oranı eklenmez.
+              </p>
+            </label>
           </div>
         </div>
 
@@ -361,9 +435,9 @@ export default function AdminCategoryForm({ category }) {
         <div className="card space-y-3 p-6">
           <h2 className="font-semibold text-gray-800">Maliyet ve Fiyatlandırma</h2>
           <p className="text-xs text-gray-500">
-            Bu turun rezervasyon fiyatının nasıl hesaplanacağını buradan yapılandırın — araç ve diğer
-            sabit maliyetlere rol bazlı kâr oranı uygulanır, isteğe bağlı kalemler ham maliyetiyle
-            eklenir.
+            {form.booking_type === 'small_group'
+              ? 'Small Group turlarda fiyat, yukarıdaki "Price" alanından kişi başı olarak belirlenir. Burada sadece isteğe bağlı kalemleri yönetebilirsiniz.'
+              : 'Bu turun rezervasyon fiyatının nasıl hesaplanacağını buradan yapılandırın — araç ve diğer sabit maliyetlere rol bazlı kâr oranı uygulanır, isteğe bağlı kalemler ham maliyetiyle eklenir.'}
           </p>
           <CostPricingEditor
             vehicleTiers={form.vehicle_tiers}
@@ -372,7 +446,22 @@ export default function AdminCategoryForm({ category }) {
             onChangeVehicleTiers={(v) => update('vehicle_tiers', v)}
             onChangeFixedCosts={(v) => update('fixed_costs', v)}
             onChangeOptionalCosts={(v) => update('optional_costs', v)}
+            bookingType={form.booking_type}
+            basePricePerPerson={Number(form.price) || 0}
           />
+        </div>
+
+        <div className="card space-y-3 p-6">
+          <h2 className="font-semibold text-gray-800">Müsaitlik (Availability)</h2>
+          <p className="text-xs text-gray-500">
+            Bu tarih takvimi hem Private hem Small Group turlar için kullanılır — müşteri booking
+            widget'ında sadece "Available" işaretli tarihleri seçebilir.
+          </p>
+          {isEdit ? (
+            <AvailabilityCalendar mode="admin" availabilityMap={availabilityMap} onStatusChange={handleAvailabilityChange} />
+          ) : (
+            <p className="text-sm text-gray-500">Müsaitlik takvimini düzenlemek için önce turu kaydedin.</p>
+          )}
         </div>
 
         <div className="card space-y-4 p-6">

@@ -71,6 +71,41 @@ export function calculateTourPrice({ tour, partySize = 1, selectedOptionalIds = 
   };
 }
 
+// Faz 3 — Small Group tours: flat per-person price (tours.price) x guests,
+// no role-based markup, plus selected optional_costs at raw per-person cost.
+// See server/lib/pricing.js's calculateSmallGroupPrice for the full note.
+export function calculateSmallGroupPrice({ tour, partySize = 1, selectedOptionalIds = [] } = {}) {
+  const n = Math.max(1, Number(partySize) || 1);
+  const pricePerPerson = Number(tour && tour.price) || 0;
+  const optionalCosts = (tour && tour.optional_costs) || [];
+
+  const baseTotal = pricePerPerson * n;
+
+  const selectedSet = new Set((selectedOptionalIds || []).map((v) => String(v)));
+  const selectedOptionalItems = optionalCosts
+    .filter((c) => selectedSet.has(String(c.id)))
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      category: c.category,
+      cost_per_person: Number(c.cost_per_person) || 0,
+      line_total: round2((Number(c.cost_per_person) || 0) * n),
+    }));
+  const optionalTotal = selectedOptionalItems.reduce((sum, c) => sum + c.line_total, 0);
+
+  const total = baseTotal + optionalTotal;
+
+  return {
+    partySize: n,
+    bookingType: 'small_group',
+    pricePerPerson,
+    baseTotal: round2(baseTotal),
+    selectedOptionalItems,
+    optionalTotal: round2(optionalTotal),
+    total: round2(total),
+  };
+}
+
 export const OPTIONAL_COST_CATEGORIES = [
   { value: 'entrance', label: 'Giriş Ücreti' },
   { value: 'food', label: 'Yemek' },

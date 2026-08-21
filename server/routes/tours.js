@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const asyncHandler = require('../lib/asyncHandler');
+const { attachPublicAvailability } = require('../lib/availabilityRoutes');
 
 const router = express.Router();
 
@@ -44,5 +45,15 @@ router.get(
     res.json(withDepartureSlug(item));
   })
 );
+
+// GET /api/tours/:slug/availability?from=YYYY-MM-DD&to=YYYY-MM-DD - public
+// read-only availability for the booking widget on the tour detail page
+// (Faz 3 — reuses the same generic availability table Transfer already
+// uses).
+attachPublicAvailability(router, {
+  itemType: 'tour',
+  collection: db.tours,
+  notFoundMessage: 'Tour not found.',
+});
 
 module.exports = router;

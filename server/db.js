@@ -86,6 +86,7 @@ const SCHEMA_STATEMENTS = [
     vehicle_tiers JSON,
     fixed_costs JSON,
     optional_costs JSON,
+    booking_type VARCHAR(20) NOT NULL DEFAULT 'private',
     seo_title VARCHAR(255) NOT NULL DEFAULT '',
     seo_description VARCHAR(500) NOT NULL DEFAULT '',
     created_at VARCHAR(40) NOT NULL,
@@ -241,7 +242,8 @@ const SCHEMA_STATEMENTS = [
     agency_markup_percent DECIMAL(6,2) NOT NULL DEFAULT 10,
     customer_markup_percent DECIMAL(6,2) NOT NULL DEFAULT 20,
     sample_content_seeded TINYINT(1) NOT NULL DEFAULT 0,
-    sample_transfer_seeded TINYINT(1) NOT NULL DEFAULT 0
+    sample_transfer_seeded TINYINT(1) NOT NULL DEFAULT 0,
+    sample_small_group_seeded TINYINT(1) NOT NULL DEFAULT 0
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 
   `CREATE TABLE IF NOT EXISTS page_content (
@@ -286,6 +288,10 @@ async function runColumnMigrations() {
 
   // Faz 6 — Transfer.
   await ensureColumn('settings', 'sample_transfer_seeded', 'TINYINT(1) NOT NULL DEFAULT 0');
+
+  // Faz 3 — Tours booking type (Private vs Small Group).
+  await ensureColumn('tours', 'booking_type', "VARCHAR(20) NOT NULL DEFAULT 'private'");
+  await ensureColumn('settings', 'sample_small_group_seeded', 'TINYINT(1) NOT NULL DEFAULT 0');
 }
 
 // --- One-time migration: server/data.json -> MySQL ---
@@ -549,6 +555,12 @@ async function migrateFromJsonIfNeeded() {
 // never equal one of these, or it would be indistinguishable from a
 // /tours/:type or /tours/from-:departure filter page.
 const TOUR_TYPES = ['package', 'daily', 'activity'];
+// Faz 3 — booking model for a tour. 'private': cost/pricing engine (vehicle
+// tiers + fixed costs + role-based markup) computes the price, same as
+// Transfer. 'small_group': guaranteed-departure tour with a flat price
+// (tours.price) x guests, no markup — guests simply join one of the
+// existing scheduled groups. See server/lib/pricing.js.
+const BOOKING_TYPES = ['private', 'small_group'];
 const RESERVED_TOUR_SLUGS = new Set(['tours', 'package', 'daily', 'activities', 'activity']);
 function isReservedTourSlug(slug) {
   return RESERVED_TOUR_SLUGS.has(slug) || slug.startsWith('from-');
@@ -686,9 +698,9 @@ const tours = {
       `INSERT INTO tours (slug, type, departure_point, title, summary, description, price, original_price,
          price_note, currency, duration_days, location, start_date, capacity, status, cover_image,
          languages, highlights, included, excluded, images, itinerary, route,
-         vehicle_tiers, fixed_costs, optional_costs, seo_title, seo_description,
+         vehicle_tiers, fixed_costs, optional_costs, booking_type, seo_title, seo_description,
          created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         input.slug,
         TOUR_TYPES.includes(input.type) ? input.type : 'package',
@@ -716,6 +728,7 @@ const tours = {
         j(normalizeVehicleTiers(input.vehicle_tiers)),
         j(normalizeFixedCosts(input.fixed_costs)),
         j(normalizeOptionalCosts(input.optional_costs)),
+        BOOKING_TYPES.includes(input.booking_type) ? input.booking_type : 'private',
         input.seo_title || '',
         input.seo_description || '',
         now,
@@ -732,7 +745,7 @@ const tours = {
          price = ?, original_price = ?, price_note = ?, currency = ?, duration_days = ?, location = ?,
          start_date = ?, capacity = ?, status = ?, cover_image = ?, languages = ?, highlights = ?,
          included = ?, excluded = ?, images = ?, itinerary = ?, route = ?,
-         vehicle_tiers = ?, fixed_costs = ?, optional_costs = ?, seo_title = ?,
+         vehicle_tiers = ?, fixed_costs = ?, optional_costs = ?, booking_type = ?, seo_title = ?,
          seo_description = ?, updated_at = ? WHERE id = ?`,
       [
         input.slug || existing.slug,
@@ -761,6 +774,7 @@ const tours = {
         j(normalizeVehicleTiers(input.vehicle_tiers)),
         j(normalizeFixedCosts(input.fixed_costs)),
         j(normalizeOptionalCosts(input.optional_costs)),
+        BOOKING_TYPES.includes(input.booking_type) ? input.booking_type : 'private',
         input.seo_title || '',
         input.seo_description || '',
         nowIso(),
@@ -1131,7 +1145,16 @@ function extractPrefixedId(raw, prefix) {
 }
 
 function rowToSettings(row) {
-  const { id, noindex_site, sample_content_seeded, sample_transfer_seeded, agency_markup_percent, customer_markup_percent, ...rest } = row;
+  const {
+    id,
+    noindex_site,
+    sample_content_seeded,
+    sample_transfer_seeded,
+    sample_small_group_seeded,
+    agency_markup_percent,
+    customer_markup_percent,
+    ...rest
+  } = row;
   return {
     ...rest,
     noindex_site: !!noindex_site,
@@ -1729,6 +1752,78 @@ async function seedSampleTransferIfNeeded() {
   );
 }
 
+// --- One-time sample Small Group tour seed (Faz 3) ---
+// Own dedicated flag (sample_small_group_seeded), NOT sample_content_seeded
+// — an already-migrated production DB has that flag at 1 already, which
+// would silently skip this brand-new sample tour otherwise. Same
+// permanent-flag guard pattern as the two seed functions above, so deleting
+// this tour later is final.
+async function seedSampleSmallGroupTourIfNeeded() {
+  await settings.get();
+  const rows = await query('SELECT sample_small_group_seeded FROM settings WHERE id = 1 LIMIT 1');
+  if (rows[0] && Number(rows[0].sample_small_group_seeded) > 0) return;
+
+  const t = {
+    title: 'Ephesus & Wine Tasting Small Group Tour (Örnek İçerik)',
+    type: 'daily',
+    departure_point: 'Kuşadası',
+    summary: 'Garanti kalkışlı, sabit fiyatlı küçük grup turu — Efes Antik Kenti ve yerel şarap tadımı.',
+    description:
+      'Bu bir örnek/önizleme içeriğidir — gerçek verilerinizi girmeye başladığınızda Admin > Turlar üzerinden silebilirsiniz, tekrar oluşturulmaz.\n\n' +
+      'Small Group (garanti kalkışlı) turlarda misafirler var olan gruplara dahil edilir ve sabit kişi başı fiyat üzerinden rezervasyon yapılır — Private turlardaki araç/sabit maliyet ve kâr oranı hesaplaması bu tur tipinde uygulanmaz.',
+    price: 89,
+    original_price: 0,
+    price_note: 'Kişi başı sabit fiyat — garanti kalkışlı grup turu',
+    currency: 'EUR',
+    duration_days: 1,
+    location: 'Efes / Selçuk',
+    start_date: '',
+    capacity: 20,
+    status: 'published',
+    languages: ['TR', 'EN'],
+    highlights: ['Efes Antik Kenti', 'Yerel Şarap Tadımı', 'Garanti Kalkış'],
+    included: ['Rehber', 'Ulaşım (Grup Aracı)'],
+    excluded: ['Efes Giriş Ücreti (isteğe bağlı olarak eklenebilir)', 'Terrace Houses Girişi (isteğe bağlı olarak eklenebilir)'],
+    images: [],
+    itinerary: [],
+    route: [],
+    vehicle_tiers: [],
+    fixed_costs: [],
+    booking_type: 'small_group',
+    optional_costs: [
+      { name: 'Efes Giriş (Ephesus Tickets)', cost_per_person: 40, category: 'entrance' },
+      { name: 'Terrace Houses Girişi', cost_per_person: 15, category: 'entrance' },
+    ],
+    seo_title: '',
+    seo_description: '',
+  };
+
+  const rawSlug = slugify(t.title, { lower: true, strict: true });
+  let slug = isReservedTourSlug(rawSlug) ? `tour-${rawSlug}` : rawSlug;
+  let i = 2;
+  while ((await tours.slugExists(slug)) || isReservedTourSlug(slug)) {
+    slug = `${rawSlug}-${i++}`;
+  }
+  const created = await tours.create({ ...t, slug });
+
+  // A couple of sample availability entries so the booking widget's calendar
+  // shows all three states on a fresh install, not just "every date is
+  // available by default".
+  const today = new Date();
+  function addDays(n) {
+    const d = new Date(today);
+    d.setDate(d.getDate() + n);
+    return d.toISOString().slice(0, 10);
+  }
+  await availability.setForItem('tour', created.id, addDays(5), 'on_request');
+  await availability.setForItem('tour', created.id, addDays(9), 'closed');
+
+  await pool.query('UPDATE settings SET sample_small_group_seeded = 1 WHERE id = 1');
+  console.log(
+    '[db] Seeded 1 sample preview Small Group tour. Delete it from Admin > Tours whenever you like — it will not be recreated.'
+  );
+}
+
 async function init() {
   await pool.query('SELECT 1'); // fail fast with a clear error if DB_* is wrong
   await createSchema();
@@ -1737,6 +1832,7 @@ async function init() {
   await ensureAdminUser();
   await seedSampleContentIfNeeded();
   await seedSampleTransferIfNeeded();
+  await seedSampleSmallGroupTourIfNeeded();
 }
 
 module.exports = {
@@ -1756,6 +1852,7 @@ module.exports = {
   settings,
   pageContent,
   TOUR_TYPES,
+  BOOKING_TYPES,
   isReservedTourSlug,
   departureSlug,
 };

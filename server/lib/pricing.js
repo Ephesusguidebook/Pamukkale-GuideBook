@@ -96,4 +96,45 @@ function calculateTourPrice({ tour, partySize = 1, selectedOptionalIds = [], rol
   };
 }
 
-module.exports = { calculateTourPrice, pickVehicleTier, round2 };
+// Faz 3 — Small Group tours (guaranteed departure).
+// Confirmed formula: flat per-person price (tours.price) x guests, with NO
+// role-based markup at all (unlike Private tours), plus any customer-picked
+// optional_costs at raw per-person cost — same optional-items rule as
+// Private tours. Guests simply join one of the existing scheduled
+// departures; there is no vehicle tier / fixed cost concept here.
+// tour: { price, optional_costs }
+// partySize: number of guests booking
+// selectedOptionalIds: ids of optional_costs items the customer chose to add
+function calculateSmallGroupPrice({ tour, partySize = 1, selectedOptionalIds = [] } = {}) {
+  const n = Math.max(1, Number(partySize) || 1);
+  const pricePerPerson = Number(tour && tour.price) || 0;
+  const optionalCosts = (tour && tour.optional_costs) || [];
+
+  const baseTotal = pricePerPerson * n;
+
+  const selectedSet = new Set((selectedOptionalIds || []).map((v) => String(v)));
+  const selectedOptionalItems = optionalCosts
+    .filter((c) => selectedSet.has(String(c.id)))
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      category: c.category,
+      cost_per_person: Number(c.cost_per_person) || 0,
+      line_total: round2((Number(c.cost_per_person) || 0) * n),
+    }));
+  const optionalTotal = selectedOptionalItems.reduce((sum, c) => sum + c.line_total, 0);
+
+  const total = baseTotal + optionalTotal;
+
+  return {
+    partySize: n,
+    bookingType: 'small_group',
+    pricePerPerson,
+    baseTotal: round2(baseTotal),
+    selectedOptionalItems,
+    optionalTotal: round2(optionalTotal),
+    total: round2(total),
+  };
+}
+
+module.exports = { calculateTourPrice, calculateSmallGroupPrice, pickVehicleTier, round2 };

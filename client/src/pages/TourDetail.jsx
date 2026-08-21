@@ -1,24 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api';
-import ContactForm from '../components/ContactForm';
 import ConsultantCard from '../components/ConsultantCard';
 import RouteMap from '../components/RouteMap';
+import TourBookingWidget from '../components/TourBookingWidget';
 import useJsonLd from '../lib/useJsonLd';
 import useSeo from '../lib/useSeo';
-import { TOUR_TYPE_BY_VALUE, TYPE_TO_CONTACT_ITEM_TYPE } from '../lib/tourRouting';
-
-function formatPrice(price, currency) {
-  try {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency || 'USD',
-      maximumFractionDigits: 0,
-    }).format(price || 0);
-  } catch {
-    return `${price} ${currency || ''}`;
-  }
-}
+import { TOUR_TYPE_BY_VALUE } from '../lib/tourRouting';
 
 // Detail page for a single tour at /tours/:slug — replaces the old
 // per-category CategoryDetail, now generic across Package/Daily/Activity
@@ -128,10 +116,6 @@ export default function TourDetail({ slug }) {
       : item.cover_image
         ? [{ url: item.cover_image }]
         : [];
-  const hasDiscount = item.original_price > 0 && item.original_price > item.price;
-  const discountPct = hasDiscount
-    ? Math.round(100 - (item.price / item.original_price) * 100)
-    : 0;
 
   // Scrolls the main slider to a given slide — used by the thumbnail strip
   // and the photo gallery grid below (the "sub galleries"). The main
@@ -377,31 +361,7 @@ export default function TourDetail({ slug }) {
             )}
           </div>
 
-          <div className="card p-5">
-            <div className="flex items-baseline gap-2">
-              {hasDiscount && (
-                <span className="text-sm text-gray-400 line-through">
-                  {formatPrice(item.original_price, item.currency)}
-                </span>
-              )}
-              {hasDiscount && (
-                <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white">
-                  -{discountPct}%
-                </span>
-              )}
-            </div>
-            <p className="text-3xl font-bold text-teal-700">
-              {formatPrice(item.price, item.currency)}
-              <span className="ml-1 text-sm font-normal text-gray-400">/ person</span>
-            </p>
-            {item.price_note && <p className="mt-1 text-xs text-gray-500">{item.price_note}</p>}
-          </div>
-
-          <ContactForm
-            itemType={TYPE_TO_CONTACT_ITEM_TYPE[item.type]}
-            itemId={item.id}
-            itemTitle={item.title}
-          />
+          <TourBookingWidget item={item} />
 
           <ConsultantCard />
         </div>

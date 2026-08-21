@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../api';
-import { calculateTourPrice, OPTIONAL_COST_CATEGORIES } from '../lib/pricing';
+import { calculateTourPrice, calculateSmallGroupPrice, OPTIONAL_COST_CATEGORIES } from '../lib/pricing';
 
 // Faz 2 — Cost & Pricing screen for a single tour. Three editable lists:
 //   - Vehicle tiers: tiered FIXED cost by party size (e.g. Vito up to 5,
@@ -34,7 +34,15 @@ export default function CostPricingEditor({
   onChangeVehicleTiers,
   onChangeFixedCosts,
   onChangeOptionalCosts,
+  // Faz 3 — Small Group tours skip the vehicle-tier/fixed-cost/markup
+  // machinery entirely: they have one flat per-person price (the tour's own
+  // `price` field, passed here as basePricePerPerson) x guests, with only
+  // the optional-add-ons editor still shown. Defaults keep this component
+  // behaving exactly as before for Private tours (the default).
+  bookingType = 'private',
+  basePricePerPerson = 0,
 }) {
+  const isSmallGroup = bookingType === 'small_group';
   const [markupRates, setMarkupRates] = useState({ agency_markup_percent: 20, customer_markup_percent: 10 });
   const [previewPartySize, setPreviewPartySize] = useState(2);
   const [previewRole, setPreviewRole] = useState('customer');
@@ -90,118 +98,139 @@ export default function CostPricingEditor({
     setPreviewSelected((sel) => (sel.includes(id) ? sel.filter((v) => v !== id) : [...sel, id]));
   }
 
-  const preview = calculateTourPrice({
-    tour: {
-      vehicle_tiers: vehicleTiers.map((t, i) => ({ ...t, id: t.id ?? i + 1 })),
-      fixed_costs: fixedCosts.map((c, i) => ({ ...c, id: c.id ?? i + 1 })),
-      optional_costs: previewOptionalCosts,
-    },
-    partySize: previewPartySize,
-    selectedOptionalIds: previewSelected,
-    role: previewRole,
-    markupRates,
-  });
+  const preview = isSmallGroup
+    ? calculateSmallGroupPrice({
+        tour: { price: basePricePerPerson, optional_costs: previewOptionalCosts },
+        partySize: previewPartySize,
+        selectedOptionalIds: previewSelected,
+      })
+    : calculateTourPrice({
+        tour: {
+          vehicle_tiers: vehicleTiers.map((t, i) => ({ ...t, id: t.id ?? i + 1 })),
+          fixed_costs: fixedCosts.map((c, i) => ({ ...c, id: c.id ?? i + 1 })),
+          optional_costs: previewOptionalCosts,
+        },
+        partySize: previewPartySize,
+        selectedOptionalIds: previewSelected,
+        role: previewRole,
+        markupRates,
+      });
 
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="font-semibold text-gray-800">Araç (Sabit Maliyet — Kapasiteye Göre Kademeli)</h3>
-        <p className="mt-1 text-xs text-gray-500">
-          Kişi sayısına göre hangi aracın kullanılacağını ve maliyetini girin (örn. 1-5 kişi Vito, 6-12
-          kişi Sprinter). Bu maliyete rol bazlı kâr oranı (Ayarlar sayfasından) uygulanır.
-        </p>
-        <div className="mt-3 space-y-2">
-          {vehicleTiers.map((t, idx) => (
-            <div key={idx} className="grid grid-cols-2 gap-2 rounded-lg border border-gray-200 p-3 sm:grid-cols-5 sm:items-end">
-              <div>
-                <label className="label">Min Kişi</label>
-                <input
-                  type="number"
-                  min={1}
-                  className="input"
-                  value={t.min_people}
-                  onChange={(e) => updateTier(idx, 'min_people', e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="label">Max Kişi</label>
-                <input
-                  type="number"
-                  min={1}
-                  className="input"
-                  placeholder="Sınırsız"
-                  value={t.max_people}
-                  onChange={(e) => updateTier(idx, 'max_people', e.target.value)}
-                />
-              </div>
-              <div className="sm:col-span-1">
-                <label className="label">Araç Adı</label>
-                <input
-                  className="input"
-                  placeholder="Vito"
-                  value={t.vehicle_name}
-                  onChange={(e) => updateTier(idx, 'vehicle_name', e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="label">Maliyet</label>
-                <input
-                  type="number"
-                  min={0}
-                  className="input"
-                  value={t.cost}
-                  onChange={(e) => updateTier(idx, 'cost', e.target.value)}
-                />
-              </div>
-              <button type="button" onClick={() => removeTier(idx)} className="btn-danger !px-3 !py-2 text-xs">
-                Kaldır
-              </button>
-            </div>
-          ))}
+      {isSmallGroup && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <p className="font-semibold">Small Group Tur — Sabit Fiyat</p>
+          <p className="mt-1 text-xs">
+            Bu tur Small Group (garanti kalkışlı) olduğu için Araç/Sabit Maliyet ve kâr oranı formülü
+            uygulanmaz. Fiyat, yukarıdaki "Fiyat" alanındaki kişi başı tutar × kişi sayısı olarak
+            hesaplanır. Sadece isteğe bağlı kalemleri (kişi başı ekstralar) burada yönetebilirsiniz.
+          </p>
         </div>
-        <button type="button" onClick={addTier} className="btn-secondary mt-2">
-          + Araç Kademesi Ekle
-        </button>
-      </div>
+      )}
 
-      <div className="border-t border-gray-100 pt-4">
-        <h3 className="font-semibold text-gray-800">Diğer Sabit Maliyetler</h3>
-        <p className="mt-1 text-xs text-gray-500">
-          Grup büyüklüğünden bağımsız, her seferinde ödenen sabit kalemler (örn. Rehber). Bu maliyetlere
-          de rol bazlı kâr oranı uygulanır.
-        </p>
-        <div className="mt-3 space-y-2">
-          {fixedCosts.map((c, idx) => (
-            <div key={idx} className="grid grid-cols-2 gap-2 rounded-lg border border-gray-200 p-3 sm:grid-cols-4 sm:items-end">
-              <div className="sm:col-span-2">
-                <label className="label">Kalem Adı</label>
-                <input
-                  className="input"
-                  placeholder="Rehber"
-                  value={c.name}
-                  onChange={(e) => updateFixed(idx, 'name', e.target.value)}
-                />
+      {!isSmallGroup && (
+        <div>
+          <h3 className="font-semibold text-gray-800">Araç (Sabit Maliyet — Kapasiteye Göre Kademeli)</h3>
+          <p className="mt-1 text-xs text-gray-500">
+            Kişi sayısına göre hangi aracın kullanılacağını ve maliyetini girin (örn. 1-5 kişi Vito, 6-12
+            kişi Sprinter). Bu maliyete rol bazlı kâr oranı (Ayarlar sayfasından) uygulanır.
+          </p>
+          <div className="mt-3 space-y-2">
+            {vehicleTiers.map((t, idx) => (
+              <div key={idx} className="grid grid-cols-2 gap-2 rounded-lg border border-gray-200 p-3 sm:grid-cols-5 sm:items-end">
+                <div>
+                  <label className="label">Min Kişi</label>
+                  <input
+                    type="number"
+                    min={1}
+                    className="input"
+                    value={t.min_people}
+                    onChange={(e) => updateTier(idx, 'min_people', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="label">Max Kişi</label>
+                  <input
+                    type="number"
+                    min={1}
+                    className="input"
+                    placeholder="Sınırsız"
+                    value={t.max_people}
+                    onChange={(e) => updateTier(idx, 'max_people', e.target.value)}
+                  />
+                </div>
+                <div className="sm:col-span-1">
+                  <label className="label">Araç Adı</label>
+                  <input
+                    className="input"
+                    placeholder="Vito"
+                    value={t.vehicle_name}
+                    onChange={(e) => updateTier(idx, 'vehicle_name', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="label">Maliyet</label>
+                  <input
+                    type="number"
+                    min={0}
+                    className="input"
+                    value={t.cost}
+                    onChange={(e) => updateTier(idx, 'cost', e.target.value)}
+                  />
+                </div>
+                <button type="button" onClick={() => removeTier(idx)} className="btn-danger !px-3 !py-2 text-xs">
+                  Kaldır
+                </button>
               </div>
-              <div>
-                <label className="label">Maliyet</label>
-                <input
-                  type="number"
-                  min={0}
-                  className="input"
-                  value={c.cost}
-                  onChange={(e) => updateFixed(idx, 'cost', e.target.value)}
-                />
-              </div>
-              <button type="button" onClick={() => removeFixed(idx)} className="btn-danger !px-3 !py-2 text-xs">
-                Kaldır
-              </button>
-            </div>
-          ))}
+            ))}
+          </div>
+          <button type="button" onClick={addTier} className="btn-secondary mt-2">
+            + Araç Kademesi Ekle
+          </button>
         </div>
-        <button type="button" onClick={addFixed} className="btn-secondary mt-2">
-          + Sabit Maliyet Ekle
-        </button>
-      </div>
+      )}
+
+      {!isSmallGroup && (
+        <div className="border-t border-gray-100 pt-4">
+          <h3 className="font-semibold text-gray-800">Diğer Sabit Maliyetler</h3>
+          <p className="mt-1 text-xs text-gray-500">
+            Grup büyüklüğünden bağımsız, her seferinde ödenen sabit kalemler (örn. Rehber). Bu maliyetlere
+            de rol bazlı kâr oranı uygulanır.
+          </p>
+          <div className="mt-3 space-y-2">
+            {fixedCosts.map((c, idx) => (
+              <div key={idx} className="grid grid-cols-2 gap-2 rounded-lg border border-gray-200 p-3 sm:grid-cols-4 sm:items-end">
+                <div className="sm:col-span-2">
+                  <label className="label">Kalem Adı</label>
+                  <input
+                    className="input"
+                    placeholder="Rehber"
+                    value={c.name}
+                    onChange={(e) => updateFixed(idx, 'name', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="label">Maliyet</label>
+                  <input
+                    type="number"
+                    min={0}
+                    className="input"
+                    value={c.cost}
+                    onChange={(e) => updateFixed(idx, 'cost', e.target.value)}
+                  />
+                </div>
+                <button type="button" onClick={() => removeFixed(idx)} className="btn-danger !px-3 !py-2 text-xs">
+                  Kaldır
+                </button>
+              </div>
+            ))}
+          </div>
+          <button type="button" onClick={addFixed} className="btn-secondary mt-2">
+            + Sabit Maliyet Ekle
+          </button>
+        </div>
+      )}
 
       <div className="border-t border-gray-100 pt-4">
         <h3 className="font-semibold text-gray-800">İsteğe Bağlı Kalemler (Kişi Başı)</h3>
@@ -273,13 +302,15 @@ export default function CostPricingEditor({
               onChange={(e) => setPreviewPartySize(Math.max(1, Number(e.target.value) || 1))}
             />
           </div>
-          <div>
-            <label className="label">Rol</label>
-            <select className="input" value={previewRole} onChange={(e) => setPreviewRole(e.target.value)}>
-              <option value="customer">Müşteri (%{markupRates.customer_markup_percent ?? 0})</option>
-              <option value="agency">Acente (%{markupRates.agency_markup_percent ?? 0})</option>
-            </select>
-          </div>
+          {!isSmallGroup && (
+            <div>
+              <label className="label">Rol</label>
+              <select className="input" value={previewRole} onChange={(e) => setPreviewRole(e.target.value)}>
+                <option value="customer">Müşteri (%{markupRates.customer_markup_percent ?? 0})</option>
+                <option value="agency">Acente (%{markupRates.agency_markup_percent ?? 0})</option>
+              </select>
+            </div>
+          )}
         </div>
         {previewOptionalCosts.length > 0 && (
           <div className="mt-3">
@@ -299,19 +330,30 @@ export default function CostPricingEditor({
           </div>
         )}
         <div className="mt-4 space-y-1 border-t border-teal-200 pt-3 text-sm text-gray-700">
-          <div className="flex justify-between">
-            <span>
-              Seçilen Araç: {preview.vehicleTier ? `${preview.vehicleTier.vehicle_name} (${preview.vehicleTier.cost})` : '—'}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span>Sabit Maliyet Toplamı (araç + diğer):</span>
-            <span>{preview.fixedTotal}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Kâr Oranı Uygulanmış Sabit Maliyet (%{preview.markupPercent}):</span>
-            <span>{preview.fixedWithMarkup}</span>
-          </div>
+          {isSmallGroup ? (
+            <div className="flex justify-between">
+              <span>
+                Kişi Başı Fiyat × Kişi Sayısı ({preview.pricePerPerson} × {preview.partySize}):
+              </span>
+              <span>{preview.baseTotal}</span>
+            </div>
+          ) : (
+            <>
+              <div className="flex justify-between">
+                <span>
+                  Seçilen Araç: {preview.vehicleTier ? `${preview.vehicleTier.vehicle_name} (${preview.vehicleTier.cost})` : '—'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Sabit Maliyet Toplamı (araç + diğer):</span>
+                <span>{preview.fixedTotal}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Kâr Oranı Uygulanmış Sabit Maliyet (%{preview.markupPercent}):</span>
+                <span>{preview.fixedWithMarkup}</span>
+              </div>
+            </>
+          )}
           <div className="flex justify-between">
             <span>Seçilen İsteğe Bağlı Kalemler Toplamı:</span>
             <span>{preview.optionalTotal}</span>
