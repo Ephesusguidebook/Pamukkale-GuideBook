@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../api';
 import { calculateTourPrice } from '../lib/pricing';
 import useSeo from '../lib/useSeo';
@@ -26,6 +26,7 @@ function maxPax(route) {
 
 export default function Transfer() {
   useSeo('Book Your Transfer', 'Safe, comfortable, and on-time private airport and city transfers — door to door service.');
+  const navigate = useNavigate();
 
   const [routes, setRoutes] = useState([]);
   const [locations, setLocations] = useState([]);
@@ -33,6 +34,7 @@ export default function Transfer() {
   const [loading, setLoading] = useState(true);
   const [pickup, setPickup] = useState('');
   const [dropoff, setDropoff] = useState('');
+  const [searchNotice, setSearchNotice] = useState('');
 
   useEffect(() => {
     Promise.all([
@@ -52,9 +54,47 @@ export default function Transfer() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Drop-off should only offer destinations actually reachable from the chosen
+  // pick-up (i.e. the "other end" of a route that starts or ends there). With no
+  // pick-up selected yet, fall back to the full location list.
+  const availableDropoffs = useMemo(() => {
+    if (!pickup) return locations;
+    const reachable = new Set();
+    routes.forEach((r) => {
+      if (r.pickup_location === pickup) reachable.add(r.dropoff_location);
+      else if (r.dropoff_location === pickup) reachable.add(r.pickup_location);
+    });
+    return locations.filter((l) => reachable.has(l));
+  }, [pickup, routes, locations]);
+
+  // If the pick-up changes and the previously selected drop-off is no longer
+  // reachable from it, clear the drop-off so the two selects never disagree.
+  useEffect(() => {
+    if (dropoff && !availableDropoffs.includes(dropoff)) {
+      setDropoff('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickup]);
+
   function swap() {
     setPickup(dropoff);
     setDropoff(pickup);
+    setSearchNotice('');
+  }
+
+  function handleSearch() {
+    setSearchNotice('');
+    if (!pickup || !dropoff) return;
+    const match = routes.find(
+      (r) =>
+        (r.pickup_location === pickup && r.dropoff_location === dropoff) ||
+        (r.pickup_location === dropoff && r.dropoff_location === pickup)
+    );
+    if (match) {
+      navigate(`/transfer/${match.slug}`);
+    } else {
+      setSearchNotice('No transfer route was found for that pick-up and drop-off combination.');
+    }
   }
 
   const filtered = routes.filter((r) => {
@@ -90,7 +130,14 @@ export default function Transfer() {
           <div className="flex flex-col items-end gap-3 sm:flex-row">
             <div className="w-full">
               <label className="label">📍 Pick-up Location</label>
-              <select className="input" value={pickup} onChange={(e) => setPickup(e.target.value)}>
+              <select
+                className="input"
+                value={pickup}
+                onChange={(e) => {
+                  setPickup(e.target.value);
+                  setSearchNotice('');
+                }}
+              >
                 <option value="">Select pick-up...</option>
                 {locations.map((l) => (
                   <option key={l} value={l}>
@@ -109,19 +156,29 @@ export default function Transfer() {
             </button>
             <div className="w-full">
               <label className="label">📍 Drop-off Location</label>
-              <select className="input" value={dropoff} onChange={(e) => setDropoff(e.target.value)}>
+              <select
+                className="input"
+                value={dropoff}
+                onChange={(e) => {
+                  setDropoff(e.target.value);
+                  setSearchNotice('');
+                }}
+              >
                 <option value="">Select drop-off...</option>
-                {locations.map((l) => (
+                {availableDropoffs.map((l) => (
                   <option key={l} value={l}>
                     {l}
                   </option>
                 ))}
               </select>
             </div>
-            <button type="button" className="btn-primary w-full sm:w-auto">
+            <button type="button" onClick={handleSearch} className="btn-primary w-full sm:w-auto">
               Search →
             </button>
           </div>
+          {searchNotice && (
+            <div className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{searchNotice}</div>
+          )}
           {filterLabel && (
             <div className="flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-800">
               <span>{filterLabel}</span>
