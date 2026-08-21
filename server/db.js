@@ -94,6 +94,42 @@ const SCHEMA_STATEMENTS = [
     INDEX idx_tours_type (type)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 
+  `CREATE TABLE IF NOT EXISTS transfer_routes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    slug VARCHAR(255) NOT NULL UNIQUE,
+    title VARCHAR(500) NOT NULL DEFAULT '',
+    pickup_location VARCHAR(255) NOT NULL DEFAULT '',
+    dropoff_location VARCHAR(255) NOT NULL DEFAULT '',
+    duration_text VARCHAR(100) NOT NULL DEFAULT '',
+    distance_km INT NOT NULL DEFAULT 0,
+    summary TEXT,
+    description LONGTEXT,
+    currency VARCHAR(10) NOT NULL DEFAULT 'EUR',
+    status VARCHAR(20) NOT NULL DEFAULT 'published',
+    vehicle_tiers JSON,
+    fixed_costs JSON,
+    optional_costs JSON,
+    seo_title VARCHAR(255) NOT NULL DEFAULT '',
+    seo_description VARCHAR(500) NOT NULL DEFAULT '',
+    created_at VARCHAR(40) NOT NULL,
+    updated_at VARCHAR(40) NOT NULL,
+    INDEX idx_transfer_status (status),
+    INDEX idx_transfer_pickup (pickup_location),
+    INDEX idx_transfer_dropoff (dropoff_location)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+
+  // Generic per-date status, keyed by (item_type, item_id) so it can cover
+  // Transfer Routes now and Tours (Faz 3) later without another table.
+  `CREATE TABLE IF NOT EXISTS availability (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    item_type VARCHAR(30) NOT NULL,
+    item_id INT NOT NULL,
+    date VARCHAR(10) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'available',
+    UNIQUE KEY uniq_availability_item_date (item_type, item_id, date),
+    INDEX idx_availability_item (item_type, item_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+
   `CREATE TABLE IF NOT EXISTS blog_posts (
     id INT AUTO_INCREMENT PRIMARY KEY,
     slug VARCHAR(255) NOT NULL UNIQUE,
@@ -204,7 +240,8 @@ const SCHEMA_STATEMENTS = [
     noindex_site TINYINT(1) NOT NULL DEFAULT 1,
     agency_markup_percent DECIMAL(6,2) NOT NULL DEFAULT 10,
     customer_markup_percent DECIMAL(6,2) NOT NULL DEFAULT 20,
-    sample_content_seeded TINYINT(1) NOT NULL DEFAULT 0
+    sample_content_seeded TINYINT(1) NOT NULL DEFAULT 0,
+    sample_transfer_seeded TINYINT(1) NOT NULL DEFAULT 0
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 
   `CREATE TABLE IF NOT EXISTS page_content (
@@ -246,6 +283,9 @@ async function runColumnMigrations() {
   await ensureColumn('settings', 'agency_markup_percent', "DECIMAL(6,2) NOT NULL DEFAULT 10");
   await ensureColumn('settings', 'customer_markup_percent', "DECIMAL(6,2) NOT NULL DEFAULT 20");
   await ensureColumn('settings', 'sample_content_seeded', 'TINYINT(1) NOT NULL DEFAULT 0');
+
+  // Faz 6 — Transfer.
+  await ensureColumn('settings', 'sample_transfer_seeded', 'TINYINT(1) NOT NULL DEFAULT 0');
 }
 
 // --- One-time migration: server/data.json -> MySQL ---
@@ -755,6 +795,148 @@ const tours = {
   },
 };
 
+// --- Transfer Routes ---
+// Same Cost & Pricing shape as tours (vehicle_tiers/fixed_costs/optional_costs,
+// see server/lib/pricing.js) — a transfer route "IS a product" exactly like a
+// tour is, so it reuses the identical fixed-cost + role-based-markup formula
+// and the same admin CostPricingEditor component.
+const transferRoutes = {
+  async listPublished() {
+    return query("SELECT * FROM transfer_routes WHERE status = 'published' ORDER BY pickup_location ASC");
+  },
+  async listAll() {
+    return query('SELECT * FROM transfer_routes ORDER BY created_at DESC');
+  },
+  async getById(id) {
+    const rows = await query('SELECT * FROM transfer_routes WHERE id = ? LIMIT 1', [Number(id)]);
+    return rows[0] || null;
+  },
+  async getPublishedBySlug(slug) {
+    const rows = await query("SELECT * FROM transfer_routes WHERE slug = ? AND status = 'published' LIMIT 1", [slug]);
+    return rows[0] || null;
+  },
+  async slugExists(slug, ignoreId) {
+    const rows = await query('SELECT id FROM transfer_routes WHERE slug = ? AND id != ? LIMIT 1', [slug, Number(ignoreId) || 0]);
+    return rows.length > 0;
+  },
+  async create(input) {
+    const now = nowIso();
+    const [result] = await pool.query(
+      `INSERT INTO transfer_routes (slug, title, pickup_location, dropoff_location, duration_text,
+         distance_km, summary, description, currency, status, vehicle_tiers, fixed_costs, optional_costs,
+         seo_title, seo_description, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        input.slug,
+        input.title || '',
+        input.pickup_location || '',
+        input.dropoff_location || '',
+        input.duration_text || '',
+        Number(input.distance_km) || 0,
+        input.summary || '',
+        input.description || '',
+        input.currency || 'EUR',
+        input.status === 'draft' ? 'draft' : 'published',
+        j(normalizeVehicleTiers(input.vehicle_tiers)),
+        j(normalizeFixedCosts(input.fixed_costs)),
+        j(normalizeOptionalCosts(input.optional_costs)),
+        input.seo_title || '',
+        input.seo_description || '',
+        now,
+        now,
+      ]
+    );
+    return transferRoutes.getById(result.insertId);
+  },
+  async update(id, input) {
+    const existing = await transferRoutes.getById(id);
+    if (!existing) return null;
+    await pool.query(
+      `UPDATE transfer_routes SET slug = ?, title = ?, pickup_location = ?, dropoff_location = ?,
+         duration_text = ?, distance_km = ?, summary = ?, description = ?, currency = ?, status = ?,
+         vehicle_tiers = ?, fixed_costs = ?, optional_costs = ?, seo_title = ?, seo_description = ?,
+         updated_at = ? WHERE id = ?`,
+      [
+        input.slug || existing.slug,
+        input.title || '',
+        input.pickup_location || '',
+        input.dropoff_location || '',
+        input.duration_text || '',
+        Number(input.distance_km) || 0,
+        input.summary || '',
+        input.description || '',
+        input.currency || 'EUR',
+        input.status === 'draft' ? 'draft' : 'published',
+        j(normalizeVehicleTiers(input.vehicle_tiers)),
+        j(normalizeFixedCosts(input.fixed_costs)),
+        j(normalizeOptionalCosts(input.optional_costs)),
+        input.seo_title || '',
+        input.seo_description || '',
+        nowIso(),
+        Number(id),
+      ]
+    );
+    return transferRoutes.getById(id);
+  },
+  async remove(id) {
+    const [result] = await pool.query('DELETE FROM transfer_routes WHERE id = ?', [Number(id)]);
+    return result.affectedRows > 0;
+  },
+  async distinctLocations() {
+    const rows = await transferRoutes.listPublished();
+    const set = new Set();
+    rows.forEach((r) => {
+      if (r.pickup_location) set.add(r.pickup_location);
+      if (r.dropoff_location) set.add(r.dropoff_location);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  },
+};
+
+// --- Availability (Faz 6 — Transfer Routes; reusable later for Tours) ---
+// A date with no row is treated as 'available' by default — the admin only
+// needs to add rows for dates they want to mark 'on_request' or 'closed',
+// not for every single available day.
+const AVAILABILITY_STATUSES = ['available', 'on_request', 'closed'];
+const availability = {
+  async getForItem(itemType, itemId, { from, to } = {}) {
+    const params = [itemType, Number(itemId)];
+    let sql = 'SELECT date, status FROM availability WHERE item_type = ? AND item_id = ?';
+    if (from) {
+      sql += ' AND date >= ?';
+      params.push(from);
+    }
+    if (to) {
+      sql += ' AND date <= ?';
+      params.push(to);
+    }
+    const rows = await query(sql, params);
+    const out = {};
+    rows.forEach((r) => {
+      out[r.date] = r.status;
+    });
+    return out;
+  },
+  async setForItem(itemType, itemId, date, status) {
+    const s = AVAILABILITY_STATUSES.includes(status) ? status : 'available';
+    if (s === 'available') {
+      // No row = available (the default) — deleting keeps the table small
+      // and keeps "available" unambiguous even if it's later re-added.
+      await pool.query('DELETE FROM availability WHERE item_type = ? AND item_id = ? AND date = ?', [itemType, Number(itemId), date]);
+      return { date, status: s };
+    }
+    await pool.query(
+      `INSERT INTO availability (item_type, item_id, date, status) VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE status = VALUES(status)`,
+      [itemType, Number(itemId), date, s]
+    );
+    return { date, status: s };
+  },
+  async removeForItem(itemType, itemId) {
+    await pool.query('DELETE FROM availability WHERE item_type = ? AND item_id = ?', [itemType, Number(itemId)]);
+  },
+};
+
 // --- Blog ---
 const blogPosts = {
   async listPublished() {
@@ -833,6 +1015,7 @@ const ITEM_COLLECTIONS = {
   package_tour: () => tours,
   daily_tour: () => tours,
   activity: () => tours,
+  transfer_route: () => transferRoutes,
 };
 
 const contactMessages = {
@@ -948,7 +1131,7 @@ function extractPrefixedId(raw, prefix) {
 }
 
 function rowToSettings(row) {
-  const { id, noindex_site, sample_content_seeded, agency_markup_percent, customer_markup_percent, ...rest } = row;
+  const { id, noindex_site, sample_content_seeded, sample_transfer_seeded, agency_markup_percent, customer_markup_percent, ...rest } = row;
   return {
     ...rest,
     noindex_site: !!noindex_site,
@@ -1473,6 +1656,79 @@ async function seedSampleContentIfNeeded() {
   );
 }
 
+// --- One-time sample Transfer Route seed (Faz 6) ---
+// Same guard pattern as seedSampleContentIfNeeded above (a permanent
+// settings flag, not row existence) so deleting these later is final.
+async function seedSampleTransferIfNeeded() {
+  await settings.get();
+  const rows = await query('SELECT sample_transfer_seeded FROM settings WHERE id = 1 LIMIT 1');
+  if (rows[0] && Number(rows[0].sample_transfer_seeded) > 0) return;
+
+  const sampleRoutes = [
+    {
+      title: 'Izmir Cruise Port to Pamukkale Private Transfer Service (Örnek İçerik)',
+      pickup_location: 'Izmir Cruise Port',
+      dropoff_location: 'Pamukkale',
+      duration_text: '2hr 30min',
+      distance_km: 210,
+      summary: 'Experience a luxurious, safe, and stress-free journey between Izmir Cruise Port and Pamukkale.',
+      description:
+        'Bu bir örnek/önizleme içeriğidir — gerçek verilerinizi girmeye başladığınızda Admin > Transfers üzerinden silebilirsiniz, tekrar oluşturulmaz.\n\n' +
+        'We prioritize your comfort and safety throughout your journey. Upon arrival, we greet you and ensure you arrive safely at your destination. Our vehicle fleet is fully air-conditioned and comfortable, with options tailored to your group size:\n\n' +
+        'For 1-4 passengers: Comfortable Mercedes Vito or similar vehicles\nFor 5-12 passengers: Spacious Mercedes Sprinter or similar coaches',
+      currency: 'EUR',
+      status: 'published',
+      vehicle_tiers: [
+        { min_people: 1, max_people: 4, vehicle_name: 'Vito', cost: 151 },
+        { min_people: 5, max_people: 12, vehicle_name: 'Sprinter', cost: 216 },
+      ],
+      fixed_costs: [],
+      optional_costs: [
+        { name: 'Child Seat', cost_per_person: 8, category: 'extra' },
+        { name: 'Meet & Greet Sign', cost_per_person: 0, category: 'extra' },
+      ],
+      seo_title: '',
+      seo_description: '',
+    },
+    {
+      title: 'Bergama to Izmir Cruise Port Private Transfer Service (Örnek İçerik)',
+      pickup_location: 'Bergama',
+      dropoff_location: 'Izmir Cruise Port',
+      duration_text: '1hr 30min',
+      distance_km: 115,
+      summary: 'A comfortable, direct private transfer between Bergama (Pergamon) and Izmir Cruise Port.',
+      description:
+        'Bu bir örnek/önizleme içeriğidir — gerçek verilerinizi girmeye başladığınızda Admin > Transfers üzerinden silebilirsiniz, tekrar oluşturulmaz.\n\n' +
+        'This route covers approximately 115 kilometers and typically takes around 1 hour 30 minutes to complete, with the same premium comfort standards on the return leg.',
+      currency: 'EUR',
+      status: 'published',
+      vehicle_tiers: [
+        { min_people: 1, max_people: 4, vehicle_name: 'Vito', cost: 100 },
+        { min_people: 5, max_people: 12, vehicle_name: 'Sprinter', cost: 145 },
+      ],
+      fixed_costs: [],
+      optional_costs: [{ name: 'Child Seat', cost_per_person: 8, category: 'extra' }],
+      seo_title: '',
+      seo_description: '',
+    },
+  ];
+
+  for (const r of sampleRoutes) {
+    const rawSlug = slugify(r.title, { lower: true, strict: true });
+    let slug = rawSlug;
+    let i = 2;
+    while (await transferRoutes.slugExists(slug)) {
+      slug = `${rawSlug}-${i++}`;
+    }
+    await transferRoutes.create({ ...r, slug });
+  }
+
+  await pool.query('UPDATE settings SET sample_transfer_seeded = 1 WHERE id = 1');
+  console.log(
+    `[db] Seeded ${sampleRoutes.length} sample preview transfer route(s). Delete them from Admin > Transfers whenever you like — they will not be recreated.`
+  );
+}
+
 async function init() {
   await pool.query('SELECT 1'); // fail fast with a clear error if DB_* is wrong
   await createSchema();
@@ -1480,12 +1736,15 @@ async function init() {
   await migrateFromJsonIfNeeded();
   await ensureAdminUser();
   await seedSampleContentIfNeeded();
+  await seedSampleTransferIfNeeded();
 }
 
 module.exports = {
   init,
   adminUsers,
   tours,
+  transferRoutes,
+  availability,
   blogPosts,
   contactMessages,
   mediaFolders,

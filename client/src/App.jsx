@@ -12,6 +12,8 @@ import { TOURS_ADMIN_CATEGORY } from './lib/tourRouting';
 
 import Home from './pages/Home';
 import Tours from './pages/Tours';
+import Transfer from './pages/Transfer';
+import TransferDetail from './pages/TransferDetail';
 import BlogList from './pages/BlogList';
 import BlogDetail from './pages/BlogDetail';
 import AboutUs from './pages/AboutUs';
@@ -25,6 +27,8 @@ import Login from './pages/admin/Login';
 import AdminHome from './pages/admin/AdminHome';
 import AdminCategoryList from './pages/admin/AdminCategoryList';
 import AdminCategoryForm from './pages/admin/AdminCategoryForm';
+import AdminTransferList from './pages/admin/AdminTransferList';
+import AdminTransferForm from './pages/admin/AdminTransferForm';
 import AdminBlogList from './pages/admin/AdminBlogList';
 import AdminBlogForm from './pages/admin/AdminBlogForm';
 import Messages from './pages/admin/Messages';
@@ -60,6 +64,9 @@ export default function App() {
         <Route path="/tours/:seg1" element={<PublicLayout><Tours /></PublicLayout>} />
         <Route path="/tours/:seg1/:seg2" element={<PublicLayout><Tours /></PublicLayout>} />
 
+        <Route path="/transfer" element={<PublicLayout><Transfer /></PublicLayout>} />
+        <Route path="/transfer/:slug" element={<PublicLayout><TransferDetail /></PublicLayout>} />
+
         <Route path="/blog" element={<PublicLayout><BlogList /></PublicLayout>} />
         <Route path="/blog/:slug" element={<PublicLayout><BlogDetail /></PublicLayout>} />
 
@@ -82,6 +89,9 @@ export default function App() {
 
           <Route path="tours" element={<AdminCategoryList category={TOURS_ADMIN_CATEGORY} />} />
           <Route path="tours/:id" element={<AdminCategoryForm category={TOURS_ADMIN_CATEGORY} />} />
+
+          <Route path="transfers" element={<AdminTransferList />} />
+          <Route path="transfers/:id" element={<AdminTransferForm />} />
 
           <Route path="blog" element={<AdminBlogList />} />
           <Route path="blog/:id" element={<AdminBlogForm />} />

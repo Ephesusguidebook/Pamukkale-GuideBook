@@ -22,6 +22,11 @@ export default function Footer() {
                   </Link>
                 </li>
               ))}
+              <li>
+                <Link to="/transfer" className="hover:text-teal-700">
+                  Transfer
+                </Link>
+              </li>
             </ul>
           </div>
           <div>

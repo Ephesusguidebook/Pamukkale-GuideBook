@@ -12,6 +12,7 @@ const STATIC_PATHS = [
   '/tours/package/',
   '/tours/daily/',
   '/tours/activities/',
+  '/transfer/',
   '/blog/',
   '/about-us/',
   '/contact/',
@@ -35,15 +36,17 @@ router.get(
 
     STATIC_PATHS.forEach((p) => entries.push(urlEntry(`${SITE_URL}${p}`)));
 
-    const [departures, publishedTours, publishedPosts] = await Promise.all([
+    const [departures, publishedTours, publishedPosts, publishedRoutes] = await Promise.all([
       db.tours.distinctDeparturePoints(),
       db.tours.listPublished(),
       db.blogPosts.listPublished(),
+      db.transferRoutes.listPublished(),
     ]);
 
     departures.forEach((d) => entries.push(urlEntry(`${SITE_URL}/tours/from-${d.slug}/`)));
     publishedTours.forEach((t) => entries.push(urlEntry(`${SITE_URL}/tours/${t.slug}/`, t.updated_at)));
     publishedPosts.forEach((p) => entries.push(urlEntry(`${SITE_URL}/blog/${p.slug}/`, p.updated_at)));
+    publishedRoutes.forEach((r) => entries.push(urlEntry(`${SITE_URL}/transfer/${r.slug}/`, r.updated_at)));
 
     const xml =
       `<?xml version="1.0" encoding="UTF-8"?>\n` +
