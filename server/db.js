@@ -3,6 +3,7 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 const slugify = require('slugify');
 const mysql = require('mysql2/promise');
+const { calculateTourPrice, calculateSmallGroupPrice, round2 } = require('./lib/pricing');
 
 // MySQL-backed data layer. Every collection below is async — every call
 // site must `await` it. This replaced the original single-JSON-file layer
@@ -298,6 +299,91 @@ const SCHEMA_STATEMENTS = [
     p TEXT,
     seo_title VARCHAR(255) NOT NULL DEFAULT '',
     seo_description VARCHAR(500) NOT NULL DEFAULT ''
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+
+  // Agencies (B2B portal) — accounts are only ever created by the admin
+  // (Admin > Agencies), never public self-signup. markup_percent is a
+  // nullable per-agency override of settings.agency_markup_percent (NULL =
+  // use the global rate). status lets the admin freeze a login without
+  // deleting its booking/ledger history.
+  `CREATE TABLE IF NOT EXISTS agencies (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    company_name VARCHAR(255) NOT NULL DEFAULT '',
+    contact_name VARCHAR(255) NOT NULL DEFAULT '',
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    phone VARCHAR(50) NOT NULL DEFAULT '',
+    address VARCHAR(500) NOT NULL DEFAULT '',
+    markup_percent DECIMAL(6,2) NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    notes TEXT,
+    last_login_at VARCHAR(40) NULL,
+    created_at VARCHAR(40) NOT NULL,
+    updated_at VARCHAR(40) NOT NULL,
+    INDEX idx_agencies_status (status)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+
+  // A booking request an agency made for one of the site's tours.
+  // agency_company_name / tour_title are snapshots (same convention as
+  // tour_title on contact_messages) so a booking still reads correctly even
+  // if the agency or tour it referenced is later renamed or deleted.
+  // status: pending (just requested) -> confirmed (admin set a final price)
+  // -> cancelled. admin_notes is admin-only, never shown to the agency.
+  `CREATE TABLE IF NOT EXISTS agency_bookings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    agency_id INT NOT NULL,
+    agency_company_name VARCHAR(255) NOT NULL DEFAULT '',
+    tour_id INT NULL,
+    tour_title VARCHAR(500) NOT NULL DEFAULT '',
+    travel_date VARCHAR(20) NOT NULL DEFAULT '',
+    pax_count INT NOT NULL DEFAULT 1,
+    total_price DECIMAL(12,2) NOT NULL DEFAULT 0,
+    currency VARCHAR(8) NOT NULL DEFAULT 'EUR',
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    notes TEXT,
+    admin_notes TEXT,
+    created_at VARCHAR(40) NOT NULL,
+    updated_at VARCHAR(40) NOT NULL,
+    INDEX idx_agencybookings_agency (agency_id),
+    INDEX idx_agencybookings_status (status)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+
+  // Passenger / passport registry for one agency booking — who is actually
+  // travelling, filled in by the agency (or the admin) once known.
+  `CREATE TABLE IF NOT EXISTS agency_booking_passengers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    booking_id INT NOT NULL,
+    full_name VARCHAR(255) NOT NULL DEFAULT '',
+    nationality VARCHAR(100) NOT NULL DEFAULT '',
+    passport_number VARCHAR(100) NOT NULL DEFAULT '',
+    passport_expiry VARCHAR(20) NOT NULL DEFAULT '',
+    date_of_birth VARCHAR(20) NOT NULL DEFAULT '',
+    notes VARCHAR(500) NOT NULL DEFAULT '',
+    created_at VARCHAR(40) NOT NULL,
+    updated_at VARCHAR(40) NOT NULL,
+    INDEX idx_agencypassengers_booking (booking_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+
+  // "Ön Muhasebe" — a simple running current account (cari hesap) per
+  // agency: 'charge' entries are what the agency owes (usually mirroring a
+  // confirmed booking's total_price), 'payment' entries are what they've
+  // paid in. Balance = sum(charge) - sum(payment), computed in JS on read
+  // (per-agency volume is small) rather than stored, so it's never out of
+  // sync with the entries themselves. booking_id is set when an entry was
+  // auto-created from a booking, NULL for a manual entry (e.g. a bank
+  // transfer payment, a discount adjustment).
+  `CREATE TABLE IF NOT EXISTS agency_ledger_entries (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    agency_id INT NOT NULL,
+    booking_id INT NULL,
+    entry_date VARCHAR(20) NOT NULL DEFAULT '',
+    type VARCHAR(20) NOT NULL DEFAULT 'charge',
+    description VARCHAR(500) NOT NULL DEFAULT '',
+    amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+    currency VARCHAR(8) NOT NULL DEFAULT 'EUR',
+    created_by VARCHAR(255) NOT NULL DEFAULT '',
+    created_at VARCHAR(40) NOT NULL,
+    INDEX idx_agencyledger_agency (agency_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 ];
 
@@ -1287,6 +1373,331 @@ const attractions = {
   },
 };
 
+// --- Agencies (B2B portal) ---
+// A separate, admin-created login (never public self-signup — see the
+// table comment above) that gets its own JWT-secured portal at /agency: a
+// browsable list of every published tour at the agency's own net rate
+// (role: 'agency' in server/lib/pricing.js), a lightweight booking-request
+// flow, per-booking passenger/passport registration, and a running-balance
+// "Ön Muhasebe" ledger the admin manages and the agency can only read.
+const AGENCY_BOOKING_STATUSES = ['pending', 'confirmed', 'cancelled'];
+const AGENCY_LEDGER_TYPES = ['charge', 'payment'];
+
+function rowToAgency(row) {
+  if (!row) return row;
+  const { password_hash, ...rest } = row;
+  return {
+    ...rest,
+    markup_percent:
+      row.markup_percent === null || row.markup_percent === undefined ? null : Number(row.markup_percent),
+  };
+}
+
+const agencies = {
+  async listAll() {
+    const rows = await query('SELECT * FROM agencies ORDER BY created_at DESC');
+    return rows.map(rowToAgency);
+  },
+  async getById(id) {
+    const rows = await query('SELECT * FROM agencies WHERE id = ? LIMIT 1', [Number(id)]);
+    return rowToAgency(rows[0]) || null;
+  },
+  // Keeps password_hash — for login/change-password checks only, never
+  // returned to a client directly.
+  async findByEmailRaw(email) {
+    const rows = await query('SELECT * FROM agencies WHERE email = ? LIMIT 1', [
+      String(email || '').toLowerCase().trim(),
+    ]);
+    return rows[0] || null;
+  },
+  async findByIdRaw(id) {
+    const rows = await query('SELECT * FROM agencies WHERE id = ? LIMIT 1', [Number(id)]);
+    return rows[0] || null;
+  },
+  async emailExists(email, ignoreId) {
+    const rows = await query('SELECT id FROM agencies WHERE email = ? AND id != ? LIMIT 1', [
+      String(email || '').toLowerCase().trim(),
+      Number(ignoreId) || 0,
+    ]);
+    return rows.length > 0;
+  },
+  async create(input) {
+    const now = nowIso();
+    const hash = bcrypt.hashSync(input.password, 10);
+    const [result] = await pool.query(
+      `INSERT INTO agencies (company_name, contact_name, email, password_hash, phone, address,
+         markup_percent, status, notes, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        input.company_name || '',
+        input.contact_name || '',
+        String(input.email).toLowerCase().trim(),
+        hash,
+        input.phone || '',
+        input.address || '',
+        input.markup_percent === '' || input.markup_percent === undefined || input.markup_percent === null
+          ? null
+          : Number(input.markup_percent),
+        input.status === 'suspended' ? 'suspended' : 'active',
+        input.notes || '',
+        now,
+        now,
+      ]
+    );
+    return agencies.getById(result.insertId);
+  },
+  async update(id, input) {
+    const current = await agencies.findByIdRaw(id);
+    if (!current) return null;
+    const passwordHash = input.password ? bcrypt.hashSync(input.password, 10) : current.password_hash;
+    await pool.query(
+      `UPDATE agencies SET company_name=?, contact_name=?, email=?, password_hash=?, phone=?, address=?,
+         markup_percent=?, status=?, notes=?, updated_at=? WHERE id=?`,
+      [
+        input.company_name || '',
+        input.contact_name || '',
+        String(input.email || current.email).toLowerCase().trim(),
+        passwordHash,
+        input.phone || '',
+        input.address || '',
+        input.markup_percent === '' || input.markup_percent === undefined || input.markup_percent === null
+          ? null
+          : Number(input.markup_percent),
+        input.status === 'suspended' ? 'suspended' : 'active',
+        input.notes || '',
+        nowIso(),
+        Number(id),
+      ]
+    );
+    return agencies.getById(id);
+  },
+  async remove(id) {
+    const existingBooking = await query('SELECT id FROM agency_bookings WHERE agency_id = ? LIMIT 1', [Number(id)]);
+    if (existingBooking.length > 0) {
+      throw new Error('This agency has booking history and cannot be deleted — set it to Suspended instead.');
+    }
+    const [result] = await pool.query('DELETE FROM agencies WHERE id = ?', [Number(id)]);
+    return result.affectedRows > 0;
+  },
+  async touchLogin(id) {
+    await pool.query('UPDATE agencies SET last_login_at = ? WHERE id = ?', [nowIso(), Number(id)]);
+  },
+  async setPassword(id, newPassword) {
+    const hash = bcrypt.hashSync(newPassword, 10);
+    await pool.query('UPDATE agencies SET password_hash = ?, updated_at = ? WHERE id = ?', [
+      hash,
+      nowIso(),
+      Number(id),
+    ]);
+  },
+  // The markup rate that actually applies to this agency: its own override
+  // when set, otherwise the site-wide settings.agency_markup_percent.
+  async effectiveMarkupPercent(agency) {
+    if (agency && agency.markup_percent !== null && agency.markup_percent !== undefined) {
+      return Number(agency.markup_percent);
+    }
+    const s = await settings.get();
+    return Number(s.agency_markup_percent) || 0;
+  },
+};
+
+async function computeAgencyBalance(agencyId) {
+  const rows = await query('SELECT type, SUM(amount) AS total FROM agency_ledger_entries WHERE agency_id = ? GROUP BY type', [
+    Number(agencyId),
+  ]);
+  let charge = 0;
+  let payment = 0;
+  for (const r of rows) {
+    if (r.type === 'charge') charge = Number(r.total) || 0;
+    if (r.type === 'payment') payment = Number(r.total) || 0;
+  }
+  return round2(charge - payment);
+}
+
+const agencyBookings = {
+  async listByAgency(agencyId) {
+    return query('SELECT * FROM agency_bookings WHERE agency_id = ? ORDER BY created_at DESC', [Number(agencyId)]);
+  },
+  async listAll(filters = {}) {
+    const clauses = [];
+    const params = [];
+    if (filters.agencyId) {
+      clauses.push('agency_id = ?');
+      params.push(Number(filters.agencyId));
+    }
+    if (filters.status && AGENCY_BOOKING_STATUSES.includes(filters.status)) {
+      clauses.push('status = ?');
+      params.push(filters.status);
+    }
+    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+    return query(`SELECT * FROM agency_bookings ${where} ORDER BY created_at DESC`, params);
+  },
+  async getById(id) {
+    const rows = await query('SELECT * FROM agency_bookings WHERE id = ? LIMIT 1', [Number(id)]);
+    return rows[0] || null;
+  },
+  // Server-side estimate at request time, using the agency's own markup —
+  // just a starting point for the admin; they can adjust total_price freely
+  // when confirming.
+  async estimatePrice(tour, agency, partySize) {
+    if (!tour) return { total: 0, currency: 'EUR' };
+    if (tour.booking_type === 'small_group') {
+      const quote = calculateSmallGroupPrice({ tour, partySize });
+      return { total: quote.total, currency: tour.currency || 'EUR' };
+    }
+    const markupPercent = await agencies.effectiveMarkupPercent(agency);
+    const quote = calculateTourPrice({
+      tour,
+      partySize,
+      role: 'agency',
+      markupRates: { agency_markup_percent: markupPercent },
+    });
+    return { total: quote.total, currency: tour.currency || 'EUR' };
+  },
+  async create(input) {
+    const now = nowIso();
+    const [result] = await pool.query(
+      `INSERT INTO agency_bookings (agency_id, agency_company_name, tour_id, tour_title, travel_date,
+         pax_count, total_price, currency, status, notes, admin_notes, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        Number(input.agency_id),
+        input.agency_company_name || '',
+        input.tour_id ? Number(input.tour_id) : null,
+        input.tour_title || '',
+        input.travel_date || '',
+        Math.max(1, Number(input.pax_count) || 1),
+        Number(input.total_price) || 0,
+        input.currency || 'EUR',
+        AGENCY_BOOKING_STATUSES.includes(input.status) ? input.status : 'pending',
+        input.notes || '',
+        input.admin_notes || '',
+        now,
+        now,
+      ]
+    );
+    return agencyBookings.getById(result.insertId);
+  },
+  async update(id, input) {
+    const existing = await agencyBookings.getById(id);
+    if (!existing) return null;
+    await pool.query(
+      `UPDATE agency_bookings SET travel_date=?, pax_count=?, total_price=?, currency=?, status=?, notes=?,
+         admin_notes=?, updated_at=? WHERE id=?`,
+      [
+        input.travel_date !== undefined ? input.travel_date : existing.travel_date,
+        input.pax_count !== undefined ? Math.max(1, Number(input.pax_count) || 1) : existing.pax_count,
+        input.total_price !== undefined ? Number(input.total_price) || 0 : existing.total_price,
+        input.currency !== undefined ? input.currency : existing.currency,
+        AGENCY_BOOKING_STATUSES.includes(input.status) ? input.status : existing.status,
+        input.notes !== undefined ? input.notes : existing.notes,
+        input.admin_notes !== undefined ? input.admin_notes : existing.admin_notes,
+        nowIso(),
+        Number(id),
+      ]
+    );
+    return agencyBookings.getById(id);
+  },
+  async remove(id) {
+    await pool.query('DELETE FROM agency_booking_passengers WHERE booking_id = ?', [Number(id)]);
+    await pool.query('DELETE FROM agency_ledger_entries WHERE booking_id = ?', [Number(id)]);
+    const [result] = await pool.query('DELETE FROM agency_bookings WHERE id = ?', [Number(id)]);
+    return result.affectedRows > 0;
+  },
+};
+
+const agencyBookingPassengers = {
+  async listByBooking(bookingId) {
+    return query('SELECT * FROM agency_booking_passengers WHERE booking_id = ? ORDER BY id ASC', [Number(bookingId)]);
+  },
+  async getById(id) {
+    const rows = await query('SELECT * FROM agency_booking_passengers WHERE id = ? LIMIT 1', [Number(id)]);
+    return rows[0] || null;
+  },
+  async create(bookingId, input) {
+    const now = nowIso();
+    const [result] = await pool.query(
+      `INSERT INTO agency_booking_passengers (booking_id, full_name, nationality, passport_number,
+         passport_expiry, date_of_birth, notes, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        Number(bookingId),
+        input.full_name || '',
+        input.nationality || '',
+        input.passport_number || '',
+        input.passport_expiry || '',
+        input.date_of_birth || '',
+        input.notes || '',
+        now,
+        now,
+      ]
+    );
+    return agencyBookingPassengers.getById(result.insertId);
+  },
+  async update(id, input) {
+    const existing = await agencyBookingPassengers.getById(id);
+    if (!existing) return null;
+    await pool.query(
+      `UPDATE agency_booking_passengers SET full_name=?, nationality=?, passport_number=?, passport_expiry=?,
+         date_of_birth=?, notes=?, updated_at=? WHERE id=?`,
+      [
+        input.full_name || '',
+        input.nationality || '',
+        input.passport_number || '',
+        input.passport_expiry || '',
+        input.date_of_birth || '',
+        input.notes || '',
+        nowIso(),
+        Number(id),
+      ]
+    );
+    return agencyBookingPassengers.getById(id);
+  },
+  async remove(id) {
+    const [result] = await pool.query('DELETE FROM agency_booking_passengers WHERE id = ?', [Number(id)]);
+    return result.affectedRows > 0;
+  },
+};
+
+const agencyLedger = {
+  async listByAgency(agencyId) {
+    return query('SELECT * FROM agency_ledger_entries WHERE agency_id = ? ORDER BY entry_date DESC, id DESC', [
+      Number(agencyId),
+    ]);
+  },
+  async balanceForAgency(agencyId) {
+    return computeAgencyBalance(agencyId);
+  },
+  async getById(id) {
+    const rows = await query('SELECT * FROM agency_ledger_entries WHERE id = ? LIMIT 1', [Number(id)]);
+    return rows[0] || null;
+  },
+  async create(input) {
+    const now = nowIso();
+    const [result] = await pool.query(
+      `INSERT INTO agency_ledger_entries (agency_id, booking_id, entry_date, type, description, amount,
+         currency, created_by, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        Number(input.agency_id),
+        input.booking_id ? Number(input.booking_id) : null,
+        input.entry_date || now.slice(0, 10),
+        AGENCY_LEDGER_TYPES.includes(input.type) ? input.type : 'charge',
+        input.description || '',
+        Math.abs(Number(input.amount) || 0),
+        input.currency || 'EUR',
+        input.created_by || '',
+        now,
+      ]
+    );
+    return agencyLedger.getById(result.insertId);
+  },
+  async remove(id) {
+    const [result] = await pool.query('DELETE FROM agency_ledger_entries WHERE id = ?', [Number(id)]);
+    return result.affectedRows > 0;
+  },
+};
+
 // --- Contact messages ---
 // item_type is one of: 'package_tour' | 'daily_tour' | 'activity' | null —
 // all three legacy strings resolve against the single `tours` table (kept
@@ -1767,6 +2178,7 @@ A machine-readable sitemap is available at /sitemap.xml.
   robots_txt: `User-agent: *
 Allow: /
 Disallow: /admin
+Disallow: /agency
 
 Sitemap: ${SITE_URL}/sitemap.xml
 `,
@@ -2208,6 +2620,12 @@ module.exports = {
   blogPosts,
   destinations,
   attractions,
+  agencies,
+  agencyBookings,
+  agencyBookingPassengers,
+  agencyLedger,
+  AGENCY_BOOKING_STATUSES,
+  AGENCY_LEDGER_TYPES,
   contactMessages,
   mediaFolders,
   mediaItems,

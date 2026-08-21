@@ -39,12 +39,20 @@ MySQL Databases, or run your own MySQL/MariaDB server locally).
 /terms-and-conditions/
 /privacy-policy/
 
+/agency/login                 → Agency login (accounts are admin-created only)
+/agency                        → Agency dashboard
+/agency/tours                  → Every tour, at this agency's own rate
+/agency/bookings                → This agency's booking requests + passenger/passport registry
+/agency/ledger                  → Read-only "Ön Muhasebe" account statement
+/agency/settings                → Change password
+
 /admin/login                → Admin login
 /admin                       → Admin overview
 /admin/tours[/:id]           → Manage Tours (Package/Daily/Activity, one screen)
 /admin/transfers[/:id]        → Manage Transfer Routes
 /admin/destinations[/:id]     → Manage Destinations
 /admin/attractions[/:id]      → Manage Attractions
+/admin/agencies[/:id]         → Manage Agencies (profile, bookings, Ön Muhasebe)
 /admin/blog[/:id]            → Manage Blog Posts
 /admin/messages              → Contact form submissions
 /admin/media                 → Media Library (folders + photo uploads)
@@ -99,6 +107,12 @@ Departure Point are set on its edit form under Admin > Tours.
   city) can list child Attractions (e.g. a castle or ruin); each Attraction detail page shows
   entrance fee, opening hours, best time to visit, a live Google Maps embed, and nearby
   attractions sorted by real distance. See "Destinations & Attractions" below.
+- **Agency Portal (B2B)** (`/agency`): a separate login for travel agencies, entirely
+  distinct from the public site and from Admin. Agencies are registered by the site owner
+  only (Admin > Agencies — there's no public sign-up) and see every tour at their own net
+  rate, can request a booking, register their travelers' passport details per booking, and
+  read a running "Ön Muhasebe" account statement the admin maintains. See "Agency Portal"
+  below for the full breakdown.
 - **Not yet included:** online payment / real booking inventory (currently both Tours and
   Transfer submit a booking request pre-filled with the full selection as a contact-message
   enquiry, landing in Admin > Messages) — the data model is structured so a booking +
@@ -393,6 +407,43 @@ pages that link back into the rest of the site.
   rather than forced into a structured price/offer, since the field is free text (e.g. "€4
   (yaklaşık)") and fabricating structured pricing from it would risk invalid data.
 
+## Agency Portal (B2B)
+
+A second, entirely separate login at `/agency` for travel agencies you work with — its own
+JWT auth realm, its own token storage in the browser, its own layout and nav. An agency
+token can never be used against an `/admin` route and an admin token can never be used
+against an `/agency` route, even though both are signed with the same secret.
+
+- **Registration is admin-only.** There is no public sign-up form — you register each
+  agency yourself from **Admin > Agencies** (company/contact info, login email + password,
+  an optional per-agency markup % override, and Active/Suspended status). Suspending an
+  agency blocks its login instantly without losing its booking or ledger history; only
+  deleting is blocked while it still has bookings (suspend instead).
+- **Their own tour list, at their own rate** (`/agency/tours`): every published tour, in a
+  plain list, priced with the same Cost & Pricing engine used everywhere else on the site
+  but with `role: 'agency'` — using that agency's markup override when set, otherwise the
+  site-wide **Admin > Settings > Agency Markup %**. Small Group tours show the same flat
+  guaranteed-departure price as everyone else (no markup applies there for any role).
+- **Booking requests** (`/agency/tours` → Request Booking): a condensed version of the
+  public booking widget — pick a date against the tour's real availability calendar, set
+  the party size, see a live agency-rate estimate, add a note — submits as a `pending`
+  request. From **Admin > Agencies > [agency] > Bookings** you review it, adjust the final
+  price if needed, and set it to Confirmed or Cancelled.
+- **Passenger / passport registry** (`/agency/bookings` → Manage Passengers): once travelers
+  are known, the agency (or the admin, for oversight) registers each one — full name,
+  nationality, passport number, date of birth, passport expiry, notes — against the
+  booking they're travelling on.
+- **"Ön Muhasebe"** (`/agency/ledger`, admin-managed from the same Bookings/Ön Muhasebe
+  tabs): a simple running current account per agency — 'Charge' entries (what they owe,
+  usually one per confirmed booking, added automatically with a "Save & Add Charge to
+  Ledger" button) and 'Payment' entries (what they've paid in, e.g. a bank transfer,
+  entered manually). The balance is always `sum(charges) − sum(payments)`, computed live
+  from the entries — never stored, so it can't drift out of sync. The agency can only read
+  its own statement; entries themselves are managed from Admin > Agencies.
+- Not included yet: file upload for a scanned passport copy (the registry above is
+  text fields only — name, number, dates), and per-booking online payment (same "Not yet
+  included" note as Tours/Transfer above applies here too).
+
 ## Demo Content
 
 On first startup against a database with no tours yet, the server automatically publishes
@@ -409,6 +460,10 @@ delete them from Admin > Tours / Admin > Transfers / Admin > Destinations & Attr
 future update. This per-batch flagging is also why a future update can safely add a new
 sample batch without re-seeding content you've already deleted: an update that adds sample
 content always gets its own new flag, never reuses one from a previous batch.
+
+The Agency Portal is the one exception — no sample agency account is auto-created, since an
+agency login carries real credentials and the site owner registers each one by hand from
+Admin > Agencies anyway. Create one there to try the `/agency` flow end to end.
 
 For a larger, more visual demo (18 tours across all three types plus 6 blog posts, with
 placeholder photos), `server/scripts/seed.js` is available as an optional manual step —

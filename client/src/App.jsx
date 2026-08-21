@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom';
 import { AdminAuthProvider } from './AdminAuthContext';
+import { AgencyAuthProvider } from './AgencyAuthContext';
 import { PageContentProvider } from './PageContentContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -7,7 +8,9 @@ import WhatsAppButton from './components/WhatsAppButton';
 import FaviconSetter from './components/FaviconSetter';
 import PageviewTracker from './components/PageviewTracker';
 import AdminLayout from './components/AdminLayout';
+import AgencyLayout from './components/AgencyLayout';
 import ProtectedRoute from './components/ProtectedRoute';
+import ProtectedAgencyRoute from './components/ProtectedAgencyRoute';
 import { TOURS_ADMIN_CATEGORY } from './lib/tourRouting';
 
 import Home from './pages/Home';
@@ -39,6 +42,8 @@ import AdminDestinationList from './pages/admin/AdminDestinationList';
 import AdminDestinationForm from './pages/admin/AdminDestinationForm';
 import AdminAttractionList from './pages/admin/AdminAttractionList';
 import AdminAttractionForm from './pages/admin/AdminAttractionForm';
+import AdminAgencyList from './pages/admin/AdminAgencyList';
+import AdminAgencyForm from './pages/admin/AdminAgencyForm';
 import Messages from './pages/admin/Messages';
 import Settings from './pages/admin/Settings';
 import PageContent from './pages/admin/PageContent';
@@ -47,6 +52,13 @@ import AdminRedirects from './pages/admin/AdminRedirects';
 import AdminLogs from './pages/admin/AdminLogs';
 import AdminTraffic from './pages/admin/AdminTraffic';
 import AdminSiteFiles from './pages/admin/AdminSiteFiles';
+
+import AgencyLogin from './pages/agency/AgencyLogin';
+import AgencyHome from './pages/agency/AgencyHome';
+import AgencyTours from './pages/agency/AgencyTours';
+import AgencyBookings from './pages/agency/AgencyBookings';
+import AgencyLedger from './pages/agency/AgencyLedger';
+import AgencySettings from './pages/agency/AgencySettings';
 
 function PublicLayout({ children }) {
   return (
@@ -63,6 +75,7 @@ function PublicLayout({ children }) {
 export default function App() {
   return (
     <AdminAuthProvider>
+      <AgencyAuthProvider>
       <PageContentProvider>
       <FaviconSetter />
       <Routes>
@@ -116,6 +129,9 @@ export default function App() {
           <Route path="attractions" element={<AdminAttractionList />} />
           <Route path="attractions/:id" element={<AdminAttractionForm />} />
 
+          <Route path="agencies" element={<AdminAgencyList />} />
+          <Route path="agencies/:id" element={<AdminAgencyForm />} />
+
           <Route path="messages" element={<Messages />} />
           <Route path="media" element={<AdminMedia />} />
           <Route path="redirects" element={<AdminRedirects />} />
@@ -126,9 +142,26 @@ export default function App() {
           <Route path="page-content" element={<PageContent />} />
         </Route>
 
+        <Route path="/agency/login" element={<AgencyLogin />} />
+        <Route
+          path="/agency"
+          element={
+            <ProtectedAgencyRoute>
+              <AgencyLayout />
+            </ProtectedAgencyRoute>
+          }
+        >
+          <Route index element={<AgencyHome />} />
+          <Route path="tours" element={<AgencyTours />} />
+          <Route path="bookings" element={<AgencyBookings />} />
+          <Route path="ledger" element={<AgencyLedger />} />
+          <Route path="settings" element={<AgencySettings />} />
+        </Route>
+
         <Route path="*" element={<PublicLayout><NotFound /></PublicLayout>} />
       </Routes>
       </PageContentProvider>
+      </AgencyAuthProvider>
     </AdminAuthProvider>
   );
 }

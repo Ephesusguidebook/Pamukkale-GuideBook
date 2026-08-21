@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 const extraLinks = [
   { to: '/admin/tours', label: 'Tours', description: 'Manage Package Tours, Daily Tours and Activities — all under /tours.' },
   { to: '/admin/blog', label: 'Blog Posts', description: 'Write and manage blog articles.' },
+  { to: '/admin/agencies', label: 'Agencies', description: 'Register agency logins, review booking requests, and manage each agency’s Ön Muhasebe statement.' },
   { to: '/admin/messages', label: 'Messages', description: 'View enquiries sent through the site.' },
   { to: '/admin/media', label: 'Media Library', description: 'Upload and organize photos, converted to WebP automatically.' },
   { to: '/admin/redirects', label: 'Redirects', description: 'Send an old page URL to a new one after deleting or renaming it.' },

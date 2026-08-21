@@ -28,6 +28,9 @@ const sitemapRouter = require('./routes/sitemap');
 const llmsTxtRouter = require('./routes/llmsTxt');
 const robotsTxtRouter = require('./routes/robotsTxt');
 const adminSiteFilesRouter = require('./routes/adminSiteFiles');
+const agencyAuthRouter = require('./routes/agencyAuth');
+const agencyPortalRouter = require('./routes/agencyPortal');
+const adminAgenciesRouter = require('./routes/adminAgencies');
 const { detectBot } = require('./lib/botDetect');
 const { getOrSetSessionId } = require('./lib/session');
 
@@ -100,6 +103,9 @@ async function isKnownPath(pathname) {
   // app, not public content to validate against — always 200 so a direct
   // load or hard refresh of any admin screen doesn't get a false 404.
   if (pathname === '/admin' || pathname.startsWith('/admin/')) return true;
+  // Same reasoning as /admin above — the whole Agency portal is a
+  // client-auth-gated app section, not public indexable content.
+  if (pathname === '/agency' || pathname.startsWith('/agency/')) return true;
   if (STATIC_PAGE_PATHS.has(pathname)) return true;
   if (pathname === '/tours' || pathname.startsWith('/tours/')) {
     const rest = pathname.slice('/tours'.length).replace(/^\/|\/$/g, '');
@@ -206,6 +212,9 @@ app.use('/api/contact', contactRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/page-content', pageContentRouter);
 app.use('/api/admin/page-content', adminPageContentRouter);
+app.use('/api/agency/auth', agencyAuthRouter);
+app.use('/api/agency', agencyPortalRouter);
+app.use('/api/admin/agencies', adminAgenciesRouter);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

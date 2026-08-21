@@ -34,6 +34,9 @@ export default function AdminLayout() {
               <NavLink to="/admin/attractions" className={linkClass}>
                 Attractions
               </NavLink>
+              <NavLink to="/admin/agencies" className={linkClass}>
+                Agencies
+              </NavLink>
               <NavLink to="/admin/messages" className={linkClass}>
                 Messages
               </NavLink>
