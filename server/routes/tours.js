@@ -1,5 +1,6 @@
 const express = require('express');
 const db = require('../db');
+const asyncHandler = require('../lib/asyncHandler');
 
 const router = express.Router();
 
@@ -15,23 +16,33 @@ function withDepartureSlug(tour) {
 // published tours, used to build the departure filter chips on the /tours
 // listing page. Registered before /:slug so "meta" is never mistaken for a
 // tour's slug (though as a two-segment path it wouldn't collide anyway).
-router.get('/meta/departures', (req, res) => {
-  res.json(db.tours.distinctDeparturePoints());
-});
+router.get(
+  '/meta/departures',
+  asyncHandler(async (req, res) => {
+    res.json(await db.tours.distinctDeparturePoints());
+  })
+);
 
 // GET /api/tours?type=daily&departure=kusadasi - supports the combinable
 // type + departure-point filters behind /tours, /tours/:type,
 // /tours/from-:departure and /tours/:type/from-:departure.
-router.get('/', (req, res) => {
-  const type = db.TOUR_TYPES.includes(req.query.type) ? req.query.type : undefined;
-  const departure = req.query.departure ? String(req.query.departure).toLowerCase() : undefined;
-  res.json(db.tours.listPublishedByFilter({ type, departureSlug: departure }).map(withDepartureSlug));
-});
+router.get(
+  '/',
+  asyncHandler(async (req, res) => {
+    const type = db.TOUR_TYPES.includes(req.query.type) ? req.query.type : undefined;
+    const departure = req.query.departure ? String(req.query.departure).toLowerCase() : undefined;
+    const items = await db.tours.listPublishedByFilter({ type, departureSlug: departure });
+    res.json(items.map(withDepartureSlug));
+  })
+);
 
-router.get('/:slug', (req, res) => {
-  const item = db.tours.getPublishedBySlug(req.params.slug);
-  if (!item) return res.status(404).json({ error: 'Tour not found.' });
-  res.json(withDepartureSlug(item));
-});
+router.get(
+  '/:slug',
+  asyncHandler(async (req, res) => {
+    const item = await db.tours.getPublishedBySlug(req.params.slug);
+    if (!item) return res.status(404).json({ error: 'Tour not found.' });
+    res.json(withDepartureSlug(item));
+  })
+);
 
 module.exports = router;

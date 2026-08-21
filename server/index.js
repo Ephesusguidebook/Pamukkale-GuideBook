@@ -66,12 +66,12 @@ function classifyToursSegment(seg) {
   if (seg.startsWith('from-') && seg.length > 5) return { kind: 'departure' };
   return null;
 }
-function isKnownToursPath(segments) {
+async function isKnownToursPath(segments) {
   if (segments.length === 0) return true; // /tours itself
   if (segments.length === 1) {
     const cls = classifyToursSegment(segments[0]);
     if (cls) return true; // a type/departure filter page is always "known", even if currently empty
-    return !!db.tours.getPublishedBySlug(segments[0]);
+    return !!(await db.tours.getPublishedBySlug(segments[0]));
   }
   if (segments.length === 2) {
     const c1 = classifyToursSegment(segments[0]);
@@ -81,7 +81,7 @@ function isKnownToursPath(segments) {
   return false;
 }
 
-function isKnownPath(pathname) {
+async function isKnownPath(pathname) {
   // The whole /admin panel is a legitimate (client-auth-gated) part of the
   // app, not public content to validate against — always 200 so a direct
   // load or hard refresh of any admin screen doesn't get a false 404.
@@ -94,7 +94,7 @@ function isKnownPath(pathname) {
   const match = DETAIL_PREFIXES.find((d) => pathname.startsWith(d.prefix));
   if (!match) return false;
   const slug = pathname.slice(match.prefix.length);
-  return !!match.collection().getPublishedBySlug(slug);
+  return !!(await match.collection().getPublishedBySlug(slug));
 }
 
 app.use(cors());
@@ -105,9 +105,14 @@ app.use(express.json({ limit: '5mb' }));
 // API calls, uploaded files — carries this header, so search engines never
 // index anything on the site before it's ready. Turn it off from Admin >
 // Settings once the site is ready to go live.
-app.use((req, res, next) => {
-  if (db.settings.get().noindex_site) {
-    res.set('X-Robots-Tag', 'noindex, nofollow');
+app.use(async (req, res, next) => {
+  try {
+    const settings = await db.settings.get();
+    if (settings.noindex_site) {
+      res.set('X-Robots-Tag', 'noindex, nofollow');
+    }
+  } catch (err) {
+    return next(err);
   }
   next();
 });
@@ -126,10 +131,10 @@ app.use((req, res, next) => {
   const requestPath = req.path;
   if (req.method === 'GET' && isLoggablePath(requestPath)) {
     const sessionId = getOrSetSessionId(req, res);
-    res.on('finish', () => {
+    res.on('finish', async () => {
       try {
         const botName = detectBot(req.headers['user-agent']);
-        db.visitLogs.create({
+        await db.visitLogs.create({
           source: 'server',
           path: requestPath,
           status_code: res.statusCode,
@@ -153,11 +158,15 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Admin-configured redirects (e.g. after deleting or renaming a page) — must
 // run before the API routes / SPA catch-all so an old URL sends visitors
 // and search engines straight to the new one instead of a 404.
-app.get('*', (req, res, next) => {
+app.get('*', async (req, res, next) => {
   if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next();
-  const redirect = db.redirects.findByPath(req.path);
-  if (redirect) {
-    return res.redirect(redirect.status_code, redirect.to_path);
+  try {
+    const redirect = await db.redirects.findByPath(req.path);
+    if (redirect) {
+      return res.redirect(redirect.status_code, redirect.to_path);
+    }
+  } catch (err) {
+    return next(err);
   }
   next();
 });
@@ -180,9 +189,9 @@ app.use('/api/admin/page-content', adminPageContentRouter);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
-// SEO: sitemap.xml regenerated on every request from published content.
-// llms.txt and robots.txt are served from admin-editable text (Admin >
-// Site Files) instead of a static file.
+// SEO: sitemap.xml regenerated on every request from whatever is currently
+// published. llms.txt and robots.txt are served from admin-editable text
+// (Admin > Site Files) instead of a static file.
 app.use('/sitemap.xml', sitemapRouter);
 app.use('/llms.txt', llmsTxtRouter);
 app.use('/robots.txt', robotsTxtRouter);
@@ -209,8 +218,7 @@ function escapeAttr(str) {
 // scripts run. If both GA4 and Ads IDs are set, Google's documented pattern
 // is one shared gtag.js loader plus one gtag('config', ...) call per ID,
 // rather than loading the library twice.
-function buildGoogleHeadTags() {
-  const s = db.settings.get();
+function buildGoogleHeadTags(s) {
   const tags = [];
   if (s.google_site_verification) {
     tags.push(`<meta name="google-site-verification" content="${escapeAttr(s.google_site_verification)}" />`);
@@ -244,10 +252,8 @@ function buildGoogleHeadTags() {
 // engines not to index it, so the site can't accidentally start showing up
 // in search results before it's finished. Turn it off from Admin > Settings
 // once the site is ready to go live.
-function buildRobotsMetaTag() {
-  return db.settings.get().noindex_site
-    ? '<meta name="robots" content="noindex, nofollow" />'
-    : '';
+function buildRobotsMetaTag(s) {
+  return s.noindex_site ? '<meta name="robots" content="noindex, nofollow" />' : '';
 }
 
 if (indexHtmlTemplate) {
@@ -256,20 +262,36 @@ if (indexHtmlTemplate) {
   // catch-all below ever runs, so the Google tags above would be missing
   // from the homepage's raw HTML.
   app.use(express.static(clientDist, { index: false }));
-  app.get('*', (req, res, next) => {
+  app.get('*', async (req, res, next) => {
     if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next();
-    const headTags = [buildRobotsMetaTag(), buildGoogleHeadTags()].filter(Boolean).join('\n');
-    const html = headTags ? indexHtmlTemplate.replace('<head>', `<head>\n    ${headTags}`) : indexHtmlTemplate;
-    res.status(isKnownPath(req.path) ? 200 : 404).type('html').send(html);
+    try {
+      const [settings, known] = await Promise.all([db.settings.get(), isKnownPath(req.path)]);
+      const headTags = [buildRobotsMetaTag(settings), buildGoogleHeadTags(settings)].filter(Boolean).join('\n');
+      const html = headTags ? indexHtmlTemplate.replace('<head>', `<head>\n    ${headTags}`) : indexHtmlTemplate;
+      res.status(known ? 200 : 404).type('html').send(html);
+    } catch (err) {
+      next(err);
+    }
   });
 }
 
-// Generic error handler (e.g. multer file errors)
+// Generic error handler (e.g. multer file errors, DB errors)
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(500).json({ error: err.message || 'Server error.' });
 });
 
-app.listen(PORT, () => {
-  console.log(`[server] running on http://localhost:${PORT}`);
-});
+// The DB layer needs to create its schema / run the one-time data.json
+// import / ensure the admin account exists before any request is served —
+// all of that is now async (real DB calls), so the server only starts
+// listening once it's done.
+db.init()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`[server] running on http://localhost:${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error('[server] failed to start — could not initialize the database:', err.message);
+    process.exit(1);
+  });

@@ -1,5 +1,6 @@
 const express = require('express');
 const db = require('../db');
+const asyncHandler = require('../lib/asyncHandler');
 
 const router = express.Router();
 
@@ -27,28 +28,31 @@ function urlEntry(loc, lastmod) {
 
 // GET /sitemap.xml - regenerated on every request from whatever is
 // currently published, so it's always in sync with the admin panel.
-router.get('/', (req, res) => {
-  const entries = [];
+router.get(
+  '/',
+  asyncHandler(async (req, res) => {
+    const entries = [];
 
-  STATIC_PATHS.forEach((p) => entries.push(urlEntry(`${SITE_URL}${p}`)));
+    STATIC_PATHS.forEach((p) => entries.push(urlEntry(`${SITE_URL}${p}`)));
 
-  db.tours
-    .distinctDeparturePoints()
-    .forEach((d) => entries.push(urlEntry(`${SITE_URL}/tours/from-${d.slug}/`)));
-  db.tours
-    .listPublished()
-    .forEach((t) => entries.push(urlEntry(`${SITE_URL}/tours/${t.slug}/`, t.updated_at)));
-  db.blogPosts
-    .listPublished()
-    .forEach((p) => entries.push(urlEntry(`${SITE_URL}/blog/${p.slug}/`, p.updated_at)));
+    const [departures, publishedTours, publishedPosts] = await Promise.all([
+      db.tours.distinctDeparturePoints(),
+      db.tours.listPublished(),
+      db.blogPosts.listPublished(),
+    ]);
 
-  const xml =
-    `<?xml version="1.0" encoding="UTF-8"?>\n` +
-    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
-    entries.join('\n') +
-    `\n</urlset>`;
+    departures.forEach((d) => entries.push(urlEntry(`${SITE_URL}/tours/from-${d.slug}/`)));
+    publishedTours.forEach((t) => entries.push(urlEntry(`${SITE_URL}/tours/${t.slug}/`, t.updated_at)));
+    publishedPosts.forEach((p) => entries.push(urlEntry(`${SITE_URL}/blog/${p.slug}/`, p.updated_at)));
 
-  res.type('application/xml').send(xml);
-});
+    const xml =
+      `<?xml version="1.0" encoding="UTF-8"?>\n` +
+      `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+      entries.join('\n') +
+      `\n</urlset>`;
+
+    res.type('application/xml').send(xml);
+  })
+);
 
 module.exports = router;

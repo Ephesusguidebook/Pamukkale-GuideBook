@@ -12,8 +12,8 @@ tour-site/
   client/   → React (Vite) front end — public site + admin panel
 ```
 
-Data is stored as a single JSON file (`server/data.json`), no separate database server
-required.
+Data is stored in a MySQL database (create one from Hostinger's hPanel under Databases >
+MySQL Databases, or run your own MySQL/MariaDB server locally).
 
 ## URL Structure
 
@@ -72,7 +72,8 @@ Departure Point are set on its edit form under Admin > Tours.
 
 ## Local Development
 
-Requires Node.js 18+ (tested with Node 22).
+Requires Node.js 18+ (tested with Node 22) and a MySQL or MariaDB server (tested with
+MariaDB 10.11) reachable from where you run the backend.
 
 ### 1. Backend
 
@@ -80,15 +81,16 @@ Requires Node.js 18+ (tested with Node 22).
 cd server
 npm install
 cp .env.example .env
-# Open .env and set JWT_SECRET to a long random string, and set
-# ADMIN_EMAIL / ADMIN_PASSWORD to your own admin login.
+# Open .env and set DB_HOST / DB_PORT / DB_USER / DB_PASSWORD / DB_NAME to point at your
+# MySQL database, set JWT_SECRET to a long random string, and set ADMIN_EMAIL /
+# ADMIN_PASSWORD to your own admin login.
 npm start
 ```
 
-The server runs on `http://localhost:4000`. On first run it automatically creates an
-admin account from `ADMIN_EMAIL` / `ADMIN_PASSWORD` in `.env` (if the database is empty).
-To reset the admin account later, delete `server/data.json` and restart, or edit the file
-directly.
+The server runs on `http://localhost:4000`. On first run it automatically creates the
+database tables it needs and an admin account from `ADMIN_EMAIL` / `ADMIN_PASSWORD` in
+`.env` (if the `admin_users` table is empty). To reset the admin account later, delete the
+row from the `admin_users` table and restart.
 
 ### 2. Frontend (dev mode)
 
@@ -132,30 +134,39 @@ If you're using the "Node.js Web Application" option:
    ```
    If there's no single build command field, you can build `client/dist` locally and
    include it in the repo instead.
-4. Add these **Environment Variables**:
+4. In hPanel, go to **Databases > MySQL Databases** and create a database (and a user for
+   it, if one isn't created automatically). Note the database name, username, password and
+   host it gives you — usually `localhost` on Hostinger.
+5. Add these **Environment Variables**:
+   - `DB_HOST`, `DB_PORT` (3306), `DB_USER`, `DB_PASSWORD`, `DB_NAME` → from the database
+     you just created
    - `JWT_SECRET` → a long, random string
    - `ADMIN_EMAIL` → email for admin login
    - `ADMIN_PASSWORD` → password for admin login
    - `PORT` → Hostinger usually sets this automatically.
-5. After deploying, go to your site, log in via `/admin/login` with the credentials from
-   `.env`, and add your first Package Tour, Daily Tour or Activity.
+6. After deploying, go to your site, log in via `/admin/login` with the credentials from
+   `.env`, and add your first tour.
 
-> Note: `data.json` is stored on disk on the server. If Hostinger's Node.js hosting has
-> persistent disk (most shared/VPS plans do), this is fine. If traffic grows or you need
-> to run multiple server instances, you'll eventually want to move to a proper database
-> (e.g. MySQL/PostgreSQL) — the architecture makes that migration straightforward.
+> **Upgrading an existing deployment from the JSON-file version:** older versions of this
+> project stored everything in a single `server/data.json` file instead of a database. If
+> that file is still present next to `server/index.js` on your first deploy of this
+> version, the server automatically creates all the MySQL tables it needs and imports
+> everything from `data.json` into them — tours (with type, departure point, images,
+> itinerary), blog posts, contact messages, media library entries, redirects, admin users,
+> settings, page content and site files all carry over with their original IDs, so nothing
+> that referenced them (contact message → tour links, old admin logs, etc.) breaks. This
+> runs once, automatically, the first time the server starts up against an empty database —
+> no manual export/import step. `data.json` itself is left untouched on disk afterwards (it
+> is no longer read or written to); you can keep it as a backup or delete it once you've
+> confirmed everything looks right in the admin panel.
 >
-> **Upgrading an existing deployment:** if this server was already running the previous
-> version with separate Package Tours / Daily Tours / Activities collections, the first
-> restart after this update automatically migrates all of them into the single unified
-> **Tours** collection — each item keeps its content and is tagged with the matching
-> **Type** (Package/Daily/Activity), with **Departure Point** left blank (fill it in from
-> the admin panel where relevant, e.g. "Kusadasi", to enable the `/tours/from-...` filter
-> for that item). Any old slug that would collide with a reserved word used by the new URL
-> scheme (`tours`, `package`, `daily`, `activities`, `activity`, or anything starting with
-> `from-`) is automatically renamed with a `tour-` prefix so it keeps working as a normal
-> detail page. Old URLs like `/package-tours/...`, `/daily-tours/...` and `/activities/...`
-> will 404 after upgrading — add redirects for any you want preserved from `/admin/redirects`.
+> **Upgrading from the even older separate Package Tours / Daily Tours / Activities
+> version:** if `data.json` still has that older shape (from before the `/tours` URL
+> restructure), the same one-time import folds it into the unified Tours shape first,
+> tagging each item with its Type and reassigning any slug that collides with a reserved
+> `/tours` URL word (`tours`, `package`, `daily`, `activities`, `activity`, or anything
+> starting with `from-`) with a `tour-` prefix, exactly as before — it now just lands in
+> MySQL instead of a rewritten `data.json`.
 
 ## Extra Features
 
@@ -244,6 +255,9 @@ Titles end with "(demo)" so they're easy to find and delete later from the admin
 ## What's Next
 
 - Add a payment/booking flow when you're ready (you'll need to pick a payment provider —
-  Stripe, iyzico and PayTR are common choices).
+  Stripe, iyzico and PayTR are common choices). The move to MySQL (see above) was the
+  groundwork for this: booking and per-date availability need real transactional
+  guarantees a JSON file can't provide, so that the last seat on a tour can never be
+  double-booked by two people at once.
 - Tour categories, coupon codes and further content types can be layered on top of this
   structure fairly easily.
