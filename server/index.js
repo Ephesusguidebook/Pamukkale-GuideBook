@@ -10,6 +10,10 @@ const transferRoutesRouter = require('./routes/transferRoutes');
 const adminTransferRoutesRouter = require('./routes/adminTransferRoutes');
 const blogRouter = require('./routes/blog');
 const adminBlogRouter = require('./routes/adminBlog');
+const destinationsRouter = require('./routes/destinations');
+const adminDestinationsRouter = require('./routes/adminDestinations');
+const attractionsRouter = require('./routes/attractions');
+const adminAttractionsRouter = require('./routes/adminAttractions');
 const adminMediaRouter = require('./routes/adminMedia');
 const adminRedirectsRouter = require('./routes/adminRedirects');
 const adminLogsRouter = require('./routes/adminLogs');
@@ -50,6 +54,8 @@ const STATIC_PAGE_PATHS = new Set([
   '/tours',
   '/transfer',
   '/blog',
+  '/destinations',
+  '/attraction',
   '/about-us',
   '/contact',
   '/terms-and-conditions',
@@ -59,6 +65,8 @@ const STATIC_PAGE_PATHS = new Set([
 const DETAIL_PREFIXES = [
   { prefix: '/blog/', collection: () => db.blogPosts },
   { prefix: '/transfer/', collection: () => db.transferRoutes },
+  { prefix: '/destinations/', collection: () => db.destinations },
+  { prefix: '/attraction/', collection: () => db.attractions },
 ];
 
 // /tours URL scheme: /tours, /tours/:type, /tours/from-:departure,
@@ -184,6 +192,10 @@ app.use('/api/transfer-routes', transferRoutesRouter);
 app.use('/api/admin/transfer-routes', adminTransferRoutesRouter);
 app.use('/api/blog', blogRouter);
 app.use('/api/admin/blog', adminBlogRouter);
+app.use('/api/destinations', destinationsRouter);
+app.use('/api/admin/destinations', adminDestinationsRouter);
+app.use('/api/attractions', attractionsRouter);
+app.use('/api/admin/attractions', adminAttractionsRouter);
 app.use('/api/admin/media', adminMediaRouter);
 app.use('/api/admin/redirects', adminRedirectsRouter);
 app.use('/api/admin/logs', adminLogsRouter);

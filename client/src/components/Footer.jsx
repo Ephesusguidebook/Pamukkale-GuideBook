@@ -27,6 +27,16 @@ export default function Footer() {
                   Transfer
                 </Link>
               </li>
+              <li>
+                <Link to="/destinations" className="hover:text-teal-700">
+                  Destinations
+                </Link>
+              </li>
+              <li>
+                <Link to="/attraction" className="hover:text-teal-700">
+                  Attractions
+                </Link>
+              </li>
             </ul>
           </div>
           <div>

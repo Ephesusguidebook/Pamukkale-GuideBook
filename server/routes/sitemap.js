@@ -14,6 +14,8 @@ const STATIC_PATHS = [
   '/tours/activities/',
   '/transfer/',
   '/blog/',
+  '/destinations/',
+  '/attraction/',
   '/about-us/',
   '/contact/',
   '/faq/',
@@ -36,17 +38,21 @@ router.get(
 
     STATIC_PATHS.forEach((p) => entries.push(urlEntry(`${SITE_URL}${p}`)));
 
-    const [departures, publishedTours, publishedPosts, publishedRoutes] = await Promise.all([
+    const [departures, publishedTours, publishedPosts, publishedRoutes, publishedDestinations, publishedAttractions] = await Promise.all([
       db.tours.distinctDeparturePoints(),
       db.tours.listPublished(),
       db.blogPosts.listPublished(),
       db.transferRoutes.listPublished(),
+      db.destinations.listPublished(),
+      db.attractions.listPublished(),
     ]);
 
     departures.forEach((d) => entries.push(urlEntry(`${SITE_URL}/tours/from-${d.slug}/`)));
     publishedTours.forEach((t) => entries.push(urlEntry(`${SITE_URL}/tours/${t.slug}/`, t.updated_at)));
     publishedPosts.forEach((p) => entries.push(urlEntry(`${SITE_URL}/blog/${p.slug}/`, p.updated_at)));
     publishedRoutes.forEach((r) => entries.push(urlEntry(`${SITE_URL}/transfer/${r.slug}/`, r.updated_at)));
+    publishedDestinations.forEach((d) => entries.push(urlEntry(`${SITE_URL}/destinations/${d.slug}/`, d.updated_at)));
+    publishedAttractions.forEach((a) => entries.push(urlEntry(`${SITE_URL}/attraction/${a.slug}/`, a.updated_at)));
 
     const xml =
       `<?xml version="1.0" encoding="UTF-8"?>\n` +

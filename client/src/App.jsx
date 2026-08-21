@@ -16,6 +16,10 @@ import Transfer from './pages/Transfer';
 import TransferDetail from './pages/TransferDetail';
 import BlogList from './pages/BlogList';
 import BlogDetail from './pages/BlogDetail';
+import Destinations from './pages/Destinations';
+import DestinationDetail from './pages/DestinationDetail';
+import Attractions from './pages/Attractions';
+import AttractionDetail from './pages/AttractionDetail';
 import AboutUs from './pages/AboutUs';
 import Contact from './pages/Contact';
 import Terms from './pages/Terms';
@@ -31,6 +35,10 @@ import AdminTransferList from './pages/admin/AdminTransferList';
 import AdminTransferForm from './pages/admin/AdminTransferForm';
 import AdminBlogList from './pages/admin/AdminBlogList';
 import AdminBlogForm from './pages/admin/AdminBlogForm';
+import AdminDestinationList from './pages/admin/AdminDestinationList';
+import AdminDestinationForm from './pages/admin/AdminDestinationForm';
+import AdminAttractionList from './pages/admin/AdminAttractionList';
+import AdminAttractionForm from './pages/admin/AdminAttractionForm';
 import Messages from './pages/admin/Messages';
 import Settings from './pages/admin/Settings';
 import PageContent from './pages/admin/PageContent';
@@ -70,6 +78,12 @@ export default function App() {
         <Route path="/blog" element={<PublicLayout><BlogList /></PublicLayout>} />
         <Route path="/blog/:slug" element={<PublicLayout><BlogDetail /></PublicLayout>} />
 
+        <Route path="/destinations" element={<PublicLayout><Destinations /></PublicLayout>} />
+        <Route path="/destinations/:slug" element={<PublicLayout><DestinationDetail /></PublicLayout>} />
+
+        <Route path="/attraction" element={<PublicLayout><Attractions /></PublicLayout>} />
+        <Route path="/attraction/:slug" element={<PublicLayout><AttractionDetail /></PublicLayout>} />
+
         <Route path="/about-us" element={<PublicLayout><AboutUs /></PublicLayout>} />
         <Route path="/contact" element={<PublicLayout><Contact /></PublicLayout>} />
         <Route path="/terms-and-conditions" element={<PublicLayout><Terms /></PublicLayout>} />
@@ -95,6 +109,12 @@ export default function App() {
 
           <Route path="blog" element={<AdminBlogList />} />
           <Route path="blog/:id" element={<AdminBlogForm />} />
+
+          <Route path="destinations" element={<AdminDestinationList />} />
+          <Route path="destinations/:id" element={<AdminDestinationForm />} />
+
+          <Route path="attractions" element={<AdminAttractionList />} />
+          <Route path="attractions/:id" element={<AdminAttractionForm />} />
 
           <Route path="messages" element={<Messages />} />
           <Route path="media" element={<AdminMedia />} />

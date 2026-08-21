@@ -26,6 +26,12 @@ MySQL Databases, or run your own MySQL/MariaDB server locally).
 /tours/from-[departure]/       → Departure filter (e.g. /tours/from-kusadasi/)
 /tours/[type]/from-[departure]/→ Type + departure filters combined, either order
 /tours/[slug]/                 → Tour detail page
+/transfer/                     → Transfer route search
+/transfer/[slug]/              → Transfer route detail + booking widget
+/destinations/                 → Destinations listing
+/destinations/[slug]/          → Destination detail (Attractions, Gallery, FAQ)
+/attraction/                   → Attractions listing (filterable by destination)
+/attraction/[slug]/            → Attraction detail (fees, hours, map, nearby)
 /blog/                         → Blog listing
 /blog/[slug]/                  → Blog post
 /about-us/
@@ -36,6 +42,9 @@ MySQL Databases, or run your own MySQL/MariaDB server locally).
 /admin/login                → Admin login
 /admin                       → Admin overview
 /admin/tours[/:id]           → Manage Tours (Package/Daily/Activity, one screen)
+/admin/transfers[/:id]        → Manage Transfer Routes
+/admin/destinations[/:id]     → Manage Destinations
+/admin/attractions[/:id]      → Manage Attractions
 /admin/blog[/:id]            → Manage Blog Posts
 /admin/messages              → Contact form submissions
 /admin/media                 → Media Library (folders + photo uploads)
@@ -85,6 +94,11 @@ Departure Point are set on its edit form under Admin > Tours.
   Round Trip, optional extras) that computes the price live, and submit a reservation
   request — same as tours, this goes to Admin > Messages as an enquiry (see "Not yet
   included" below) rather than an online payment.
+- **Destinations & Attractions** (`/destinations`, `/attraction`): a lightweight travel-guide
+  content type, separate from bookable Tours/Transfer. Destinations (e.g. a cruise port or
+  city) can list child Attractions (e.g. a castle or ruin); each Attraction detail page shows
+  entrance fee, opening hours, best time to visit, a live Google Maps embed, and nearby
+  attractions sorted by real distance. See "Destinations & Attractions" below.
 - **Not yet included:** online payment / real booking inventory (currently both Tours and
   Transfer submit a booking request pre-filled with the full selection as a contact-message
   enquiry, landing in Admin > Messages) — the data model is structured so a booking +
@@ -348,21 +362,53 @@ airport pickups), alongside Tours:
   included" above), so this is the interim way a request reaches you until the full
   booking flow is built.
 
+## Destinations & Attractions
+
+A simple travel-guide content type at `/destinations` and `/attraction`, separate from the
+bookable Tours/Transfer products above — no pricing, no booking widget, just informational
+pages that link back into the rest of the site.
+
+- **Admin > Destinations**: manage Destinations — title, summary, a free-text description
+  ("Paragraf 1"), Visitor Information, a photo gallery, and a repeatable FAQ list
+  (question/answer pairs).
+- **Admin > Attractions**: manage Attractions — title, an optional parent Destination (picked
+  from a dropdown), summary/description, Entrance Fee / Opening Hours / Best Time (all free
+  text, e.g. "€10" or "Free"), Visitor Information, a photo gallery, and Latitude/Longitude
+  for the map.
+- **Public `/destinations/:slug` page**: Title, Paragraph 1, Visitor Information, an
+  "Attractions" section of clickable cards for every published Attraction under that
+  Destination, a Photo Gallery, and an FAQ accordion.
+- **Public `/attraction/:slug` page**: H1, an info bar with Entrance Fee / Opening Hours /
+  Best Time / Location (Location links back to the parent Destination automatically), Visitor
+  Information, Photo Gallery, a live Google Maps embed (built from Latitude/Longitude — no
+  Google API key needed), and a "Yakın Konumlar" (Nearby Locations) section showing other
+  Attractions under the same Destination, sorted by actual distance when both have
+  coordinates set.
+- The Destination ↔ Attraction relationship is optional on both sides: an Attraction can be
+  created without a Destination (it just won't show a Location or appear on any Destination
+  page), and a Destination with no Attractions yet simply omits that section.
+- **Schema.org / JSON-LD**: Destination pages emit `TouristDestination` (plus `FAQPage` when
+  FAQ items are present); Attraction pages emit `TouristAttraction` (with `GeoCoordinates`
+  when lat/lng are set) plus a `BreadcrumbList`. Entrance fees are shown as plain page text
+  rather than forced into a structured price/offer, since the field is free text (e.g. "€4
+  (yaklaşık)") and fabricating structured pricing from it would risk invalid data.
+
 ## Demo Content
 
 On first startup against a database with no tours yet, the server automatically publishes
 3 sample Private tours (one Package, one Daily, one Activity — titles end with "(Örnek
-İçerik)"), fully filled in including Cost & Pricing, plus 1 sample Small Group tour and 2
-sample Transfer Routes (also "(Örnek İçerik)", including a few sample availability
-dates), so you have something real to click through and review right after deploying,
-with zero setup. This only ever happens once per content type: each batch is guarded by
-its own permanent flag (`sample_content_seeded`, `sample_small_group_seeded`,
-`sample_transfer_seeded`), not by whether the sample items still exist, so once you
-delete them from Admin > Tours / Admin > Transfers (once you start entering your real
-content), they will not come back — not even after a future update. This per-batch
-flagging is also why a future update can safely add a new sample batch without
-re-seeding content you've already deleted: an update that adds sample content always
-gets its own new flag, never reuses one from a previous batch.
+İçerik)"), fully filled in including Cost & Pricing, plus 1 sample Small Group tour, 2
+sample Transfer Routes, and 1 sample Destination with 2 sample Attractions (all also
+"(Örnek İçerik)", including a few sample availability dates on the Transfer routes), so you
+have something real to click through and review right after deploying, with zero setup.
+This only ever happens once per content type: each batch is guarded by its own permanent
+flag (`sample_content_seeded`, `sample_small_group_seeded`, `sample_transfer_seeded`,
+`sample_destinations_seeded`), not by whether the sample items still exist, so once you
+delete them from Admin > Tours / Admin > Transfers / Admin > Destinations & Attractions
+(once you start entering your real content), they will not come back — not even after a
+future update. This per-batch flagging is also why a future update can safely add a new
+sample batch without re-seeding content you've already deleted: an update that adds sample
+content always gets its own new flag, never reuses one from a previous batch.
 
 For a larger, more visual demo (18 tours across all three types plus 6 blog posts, with
 placeholder photos), `server/scripts/seed.js` is available as an optional manual step —

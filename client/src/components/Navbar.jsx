@@ -59,6 +59,12 @@ export default function Navbar() {
           <NavLink to="/transfer" className={navLink}>
             Transfer
           </NavLink>
+          <NavLink to="/destinations" className={navLink}>
+            Destinations
+          </NavLink>
+          <NavLink to="/attraction" className={navLink}>
+            Attractions
+          </NavLink>
 
           <div
             className="relative"
@@ -122,6 +128,12 @@ export default function Navbar() {
             </NavLink>
             <NavLink to="/transfer" className="rounded-lg px-2 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" onClick={() => setMobileOpen(false)}>
               Transfer
+            </NavLink>
+            <NavLink to="/destinations" className="rounded-lg px-2 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" onClick={() => setMobileOpen(false)}>
+              Destinations
+            </NavLink>
+            <NavLink to="/attraction" className="rounded-lg px-2 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" onClick={() => setMobileOpen(false)}>
+              Attractions
             </NavLink>
 
             <p className="mt-2 px-2 text-xs font-semibold uppercase tracking-wide text-gray-400">

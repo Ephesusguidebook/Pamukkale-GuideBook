@@ -147,6 +147,51 @@ const SCHEMA_STATEMENTS = [
     INDEX idx_blog_status (status)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 
+  `CREATE TABLE IF NOT EXISTS destinations (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    slug VARCHAR(255) NOT NULL UNIQUE,
+    title VARCHAR(500) NOT NULL DEFAULT '',
+    summary TEXT,
+    description LONGTEXT,
+    visitor_information LONGTEXT,
+    images JSON,
+    faq JSON,
+    status VARCHAR(20) NOT NULL DEFAULT 'published',
+    cover_image VARCHAR(500) NOT NULL DEFAULT '',
+    seo_title VARCHAR(255) NOT NULL DEFAULT '',
+    seo_description VARCHAR(500) NOT NULL DEFAULT '',
+    created_at VARCHAR(40) NOT NULL,
+    updated_at VARCHAR(40) NOT NULL,
+    INDEX idx_destinations_status (status)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+
+  // No FK constraint to destinations (same loose-coupling style as
+  // media_folders.parent_id) — destination_id NULL just means "not yet
+  // assigned to a destination" rather than a broken reference.
+  `CREATE TABLE IF NOT EXISTS attractions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    slug VARCHAR(255) NOT NULL UNIQUE,
+    title VARCHAR(500) NOT NULL DEFAULT '',
+    destination_id INT NULL,
+    summary TEXT,
+    description LONGTEXT,
+    entrance_fee VARCHAR(255) NOT NULL DEFAULT '',
+    opening_hours VARCHAR(255) NOT NULL DEFAULT '',
+    best_time VARCHAR(255) NOT NULL DEFAULT '',
+    visitor_information LONGTEXT,
+    images JSON,
+    latitude DECIMAL(10,7) NULL,
+    longitude DECIMAL(10,7) NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'published',
+    cover_image VARCHAR(500) NOT NULL DEFAULT '',
+    seo_title VARCHAR(255) NOT NULL DEFAULT '',
+    seo_description VARCHAR(500) NOT NULL DEFAULT '',
+    created_at VARCHAR(40) NOT NULL,
+    updated_at VARCHAR(40) NOT NULL,
+    INDEX idx_attractions_status (status),
+    INDEX idx_attractions_destination (destination_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+
   `CREATE TABLE IF NOT EXISTS contact_messages (
     id INT AUTO_INCREMENT PRIMARY KEY,
     item_type VARCHAR(30) NULL,
@@ -243,7 +288,8 @@ const SCHEMA_STATEMENTS = [
     customer_markup_percent DECIMAL(6,2) NOT NULL DEFAULT 20,
     sample_content_seeded TINYINT(1) NOT NULL DEFAULT 0,
     sample_transfer_seeded TINYINT(1) NOT NULL DEFAULT 0,
-    sample_small_group_seeded TINYINT(1) NOT NULL DEFAULT 0
+    sample_small_group_seeded TINYINT(1) NOT NULL DEFAULT 0,
+    sample_destinations_seeded TINYINT(1) NOT NULL DEFAULT 0
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 
   `CREATE TABLE IF NOT EXISTS page_content (
@@ -292,6 +338,9 @@ async function runColumnMigrations() {
   // Faz 3 — Tours booking type (Private vs Small Group).
   await ensureColumn('tours', 'booking_type', "VARCHAR(20) NOT NULL DEFAULT 'private'");
   await ensureColumn('settings', 'sample_small_group_seeded', 'TINYINT(1) NOT NULL DEFAULT 0');
+
+  // Destinations & Attractions.
+  await ensureColumn('settings', 'sample_destinations_seeded', 'TINYINT(1) NOT NULL DEFAULT 0');
 }
 
 // --- One-time migration: server/data.json -> MySQL ---
@@ -1020,6 +1069,224 @@ const blogPosts = {
   },
 };
 
+// --- Destinations & Attractions ---
+function normalizeFaq(items) {
+  return (items || [])
+    .map((f, idx) => ({ id: idx + 1, question: f.question || '', answer: f.answer || '', sort_order: idx }))
+    .filter((f) => f.question && f.answer);
+}
+
+const destinations = {
+  async listPublished() {
+    return query("SELECT * FROM destinations WHERE status = 'published' ORDER BY created_at DESC");
+  },
+  async listAll() {
+    return query('SELECT * FROM destinations ORDER BY created_at DESC');
+  },
+  async getById(id) {
+    const rows = await query('SELECT * FROM destinations WHERE id = ? LIMIT 1', [Number(id)]);
+    return rows[0] || null;
+  },
+  async getPublishedBySlug(slug) {
+    const rows = await query("SELECT * FROM destinations WHERE slug = ? AND status = 'published' LIMIT 1", [slug]);
+    return rows[0] || null;
+  },
+  async slugExists(slug, ignoreId) {
+    const rows = await query('SELECT id FROM destinations WHERE slug = ? AND id != ? LIMIT 1', [slug, Number(ignoreId) || 0]);
+    return rows.length > 0;
+  },
+  async create(input) {
+    const now = nowIso();
+    const [result] = await pool.query(
+      `INSERT INTO destinations (slug, title, summary, description, visitor_information, images, faq,
+         status, cover_image, seo_title, seo_description, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        input.slug,
+        input.title || '',
+        input.summary || '',
+        input.description || '',
+        input.visitor_information || '',
+        j(normalizeImages(input.images)),
+        j(normalizeFaq(input.faq)),
+        input.status === 'draft' ? 'draft' : 'published',
+        input.cover_image || '',
+        input.seo_title || '',
+        input.seo_description || '',
+        now,
+        now,
+      ]
+    );
+    return destinations.getById(result.insertId);
+  },
+  async update(id, input) {
+    const existing = await destinations.getById(id);
+    if (!existing) return null;
+    await pool.query(
+      `UPDATE destinations SET slug = ?, title = ?, summary = ?, description = ?, visitor_information = ?,
+         images = ?, faq = ?, status = ?, cover_image = ?, seo_title = ?, seo_description = ?, updated_at = ?
+       WHERE id = ?`,
+      [
+        input.slug || existing.slug,
+        input.title || '',
+        input.summary || '',
+        input.description || '',
+        input.visitor_information || '',
+        j(normalizeImages(input.images)),
+        j(normalizeFaq(input.faq)),
+        input.status === 'draft' ? 'draft' : 'published',
+        input.cover_image || '',
+        input.seo_title || '',
+        input.seo_description || '',
+        nowIso(),
+        Number(id),
+      ]
+    );
+    return destinations.getById(id);
+  },
+  async remove(id) {
+    const [result] = await pool.query('DELETE FROM destinations WHERE id = ?', [Number(id)]);
+    return result.affectedRows > 0;
+  },
+};
+
+// Haversine great-circle distance in km — used only to sort an attraction's
+// "Nearby Locations" by actual proximity when both sides have coordinates;
+// dataset sizes here are small (a handful of attractions per destination) so
+// computing it in JS after a plain SQL fetch is simpler than doing it in SQL.
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function rowToAttraction(row) {
+  if (!row) return row;
+  return {
+    ...row,
+    latitude: row.latitude === null || row.latitude === undefined ? null : Number(row.latitude),
+    longitude: row.longitude === null || row.longitude === undefined ? null : Number(row.longitude),
+  };
+}
+
+const attractions = {
+  async listPublished() {
+    const rows = await query("SELECT * FROM attractions WHERE status = 'published' ORDER BY created_at DESC");
+    return rows.map(rowToAttraction);
+  },
+  async listAll() {
+    const rows = await query('SELECT * FROM attractions ORDER BY created_at DESC');
+    return rows.map(rowToAttraction);
+  },
+  async getById(id) {
+    const rows = await query('SELECT * FROM attractions WHERE id = ? LIMIT 1', [Number(id)]);
+    return rowToAttraction(rows[0]) || null;
+  },
+  async getPublishedBySlug(slug) {
+    const rows = await query("SELECT * FROM attractions WHERE slug = ? AND status = 'published' LIMIT 1", [slug]);
+    return rowToAttraction(rows[0]) || null;
+  },
+  async slugExists(slug, ignoreId) {
+    const rows = await query('SELECT id FROM attractions WHERE slug = ? AND id != ? LIMIT 1', [slug, Number(ignoreId) || 0]);
+    return rows.length > 0;
+  },
+  async listPublishedByDestination(destinationId) {
+    const rows = await query(
+      "SELECT * FROM attractions WHERE destination_id = ? AND status = 'published' ORDER BY created_at DESC",
+      [Number(destinationId)]
+    );
+    return rows.map(rowToAttraction);
+  },
+  // Other published attractions in the same destination, closest first when
+  // both this attraction and the candidate have coordinates, otherwise
+  // newest first.
+  async nearby(attraction, limit = 6) {
+    if (!attraction || !attraction.destination_id) return [];
+    const rows = await query(
+      "SELECT * FROM attractions WHERE destination_id = ? AND id != ? AND status = 'published' ORDER BY created_at DESC",
+      [Number(attraction.destination_id), Number(attraction.id)]
+    );
+    const list = rows.map(rowToAttraction);
+    if (attraction.latitude != null && attraction.longitude != null) {
+      list.sort((a, b) => {
+        const da = a.latitude != null && a.longitude != null ? haversineKm(attraction.latitude, attraction.longitude, a.latitude, a.longitude) : Infinity;
+        const db_ = b.latitude != null && b.longitude != null ? haversineKm(attraction.latitude, attraction.longitude, b.latitude, b.longitude) : Infinity;
+        return da - db_;
+      });
+    }
+    return list.slice(0, limit);
+  },
+  async create(input) {
+    const now = nowIso();
+    const [result] = await pool.query(
+      `INSERT INTO attractions (slug, title, destination_id, summary, description, entrance_fee, opening_hours,
+         best_time, visitor_information, images, latitude, longitude, status, cover_image, seo_title,
+         seo_description, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        input.slug,
+        input.title || '',
+        input.destination_id ? Number(input.destination_id) : null,
+        input.summary || '',
+        input.description || '',
+        input.entrance_fee || '',
+        input.opening_hours || '',
+        input.best_time || '',
+        input.visitor_information || '',
+        j(normalizeImages(input.images)),
+        input.latitude === '' || input.latitude === undefined || input.latitude === null ? null : Number(input.latitude),
+        input.longitude === '' || input.longitude === undefined || input.longitude === null ? null : Number(input.longitude),
+        input.status === 'draft' ? 'draft' : 'published',
+        input.cover_image || '',
+        input.seo_title || '',
+        input.seo_description || '',
+        now,
+        now,
+      ]
+    );
+    return attractions.getById(result.insertId);
+  },
+  async update(id, input) {
+    const existing = await attractions.getById(id);
+    if (!existing) return null;
+    await pool.query(
+      `UPDATE attractions SET slug = ?, title = ?, destination_id = ?, summary = ?, description = ?,
+         entrance_fee = ?, opening_hours = ?, best_time = ?, visitor_information = ?, images = ?,
+         latitude = ?, longitude = ?, status = ?, cover_image = ?, seo_title = ?, seo_description = ?,
+         updated_at = ? WHERE id = ?`,
+      [
+        input.slug || existing.slug,
+        input.title || '',
+        input.destination_id ? Number(input.destination_id) : null,
+        input.summary || '',
+        input.description || '',
+        input.entrance_fee || '',
+        input.opening_hours || '',
+        input.best_time || '',
+        input.visitor_information || '',
+        j(normalizeImages(input.images)),
+        input.latitude === '' || input.latitude === undefined || input.latitude === null ? null : Number(input.latitude),
+        input.longitude === '' || input.longitude === undefined || input.longitude === null ? null : Number(input.longitude),
+        input.status === 'draft' ? 'draft' : 'published',
+        input.cover_image || '',
+        input.seo_title || '',
+        input.seo_description || '',
+        nowIso(),
+        Number(id),
+      ]
+    );
+    return attractions.getById(id);
+  },
+  async remove(id) {
+    const [result] = await pool.query('DELETE FROM attractions WHERE id = ?', [Number(id)]);
+    return result.affectedRows > 0;
+  },
+};
+
 // --- Contact messages ---
 // item_type is one of: 'package_tour' | 'daily_tour' | 'activity' | null —
 // all three legacy strings resolve against the single `tours` table (kept
@@ -1151,6 +1418,7 @@ function rowToSettings(row) {
     sample_content_seeded,
     sample_transfer_seeded,
     sample_small_group_seeded,
+    sample_destinations_seeded,
     agency_markup_percent,
     customer_markup_percent,
     ...rest
@@ -1824,6 +2092,101 @@ async function seedSampleSmallGroupTourIfNeeded() {
   );
 }
 
+// --- One-time sample Destinations & Attractions seed ---
+// Same permanent-flag guard pattern as the seed functions above. Slugs are
+// set explicitly (not derived from the "(Örnek İçerik)" title) so they match
+// exactly what a fresh preview would land on: /destinations/izmir-cruise-port/
+// and /attraction/ayasuluk-castle-selcuk/.
+async function seedSampleDestinationsIfNeeded() {
+  await settings.get();
+  const rows = await query('SELECT sample_destinations_seeded FROM settings WHERE id = 1 LIMIT 1');
+  if (rows[0] && Number(rows[0].sample_destinations_seeded) > 0) return;
+
+  // Slugs default to the exact example URLs from the request, falling back
+  // to a numeric suffix only in the unlikely case they're already taken.
+  let destinationSlug = 'izmir-cruise-port';
+  for (let i = 2; await destinations.slugExists(destinationSlug); i++) {
+    destinationSlug = `izmir-cruise-port-${i}`;
+  }
+  const destination = await destinations.create({
+    slug: destinationSlug,
+    title: 'Izmir Cruise Port (Örnek İçerik)',
+    summary: 'İzmir Liman\'a gelen kruvaziyer yolcuları için Efes, Selçuk ve çevresini kapsayan varış noktası.',
+    description:
+      'Bu bir örnek/önizleme içeriğidir — gerçek verilerinizi girmeye başladığınızda Admin > Destinations üzerinden silebilirsiniz, tekrar oluşturulmaz.\n\n' +
+      'Izmir Cruise Port, Ege bölgesinin en popüler kruvaziyer varış noktalarından biridir. Buradan Efes Antik Kenti, Ayasuluk Kalesi ve Meryem Ana Evi gibi pek çok tarihi ve turistik yere kolayca ulaşabilirsiniz.',
+    visitor_information:
+      'En yakın havalimanı Adnan Menderes Havalimanı\'dır (yaklaşık 30 dk). Limandan şehir merkezine ve çevredeki ören yerlerine düzenli transfer ve tur seçenekleri mevcuttur. Ziyaret için en uygun aylar Nisan-Haziran ve Eylül-Kasım\'dır.',
+    images: [],
+    faq: [
+      {
+        question: 'Izmir Cruise Port\'tan Efes\'e ne kadar sürer?',
+        answer: 'Trafiğe bağlı olarak yaklaşık 1 saat sürer.',
+      },
+      {
+        question: 'Limandan destinasyon merkezine transfer var mı?',
+        answer: 'Evet, Transfer sayfamızdan liman ile çevredeki noktalar arası özel transfer rezervasyonu yapabilirsiniz.',
+      },
+    ],
+    status: 'published',
+    seo_title: '',
+    seo_description: '',
+  });
+
+  let ayasulukSlug = 'ayasuluk-castle-selcuk';
+  for (let i = 2; await attractions.slugExists(ayasulukSlug); i++) {
+    ayasulukSlug = `ayasuluk-castle-selcuk-${i}`;
+  }
+  const ayasuluk = await attractions.create({
+    slug: ayasulukSlug,
+    title: 'Ayasuluk Castle (Örnek İçerik)',
+    destination_id: destination.id,
+    summary: 'Selçuk\'ta, Aziz Yuhanna Bazilikası\'nın hemen üzerinde yükselen tarihi bir Bizans-Osmanlı kalesi.',
+    description:
+      'Bu bir örnek/önizleme içeriğidir — gerçek verilerinizi girmeye başladığınızda Admin > Attractions üzerinden silebilirsiniz, tekrar oluşturulmaz.\n\n' +
+      'Ayasuluk Kalesi, Selçuk\'un simgelerinden biridir ve tepeden Efes ovasının nefes kesen manzarasını sunar. Kale içinde Bizans dönemine ait sarnıçlar ve küçük bir mescit kalıntısı bulunur.',
+    entrance_fee: '€4 (yaklaşık)',
+    opening_hours: '08:30 - 18:30 (yaz), 08:30 - 17:00 (kış)',
+    best_time: 'Gün batımına yakın saatler',
+    visitor_information: 'Rahat yürüyüş ayakkabısı önerilir, tepeye çıkış hafif eğimlidir. Gölgelik alan azdır, özellikle yaz aylarında su almanız önerilir.',
+    images: [],
+    latitude: 37.9519,
+    longitude: 27.3672,
+    status: 'published',
+    seo_title: '',
+    seo_description: '',
+  });
+
+  let stJohnsSlug = 'st-johns-basilica';
+  for (let i = 2; await attractions.slugExists(stJohnsSlug); i++) {
+    stJohnsSlug = `st-johns-basilica-${i}`;
+  }
+  await attractions.create({
+    slug: stJohnsSlug,
+    title: "St. John's Basilica (Örnek İçerik)",
+    destination_id: destination.id,
+    summary: 'Aziz Yuhanna\'nın mezarı üzerine inşa edildiğine inanılan, Ayasuluk Tepesi eteğindeki antik bazilika kalıntısı.',
+    description:
+      'Bu bir örnek/önizleme içeriğidir — gerçek verilerinizi girmeye başladığınızda Admin > Attractions üzerinden silebilirsiniz, tekrar oluşturulmaz.\n\n' +
+      'Bizans İmparatoru I. Justinianus tarafından 6. yüzyılda inşa ettirilen bazilika, dönemin en büyük kiliselerinden biriydi. Günümüzde sütun ve temel kalıntıları ziyaret edilebilir.',
+    entrance_fee: '€3 (yaklaşık)',
+    opening_hours: '08:30 - 18:30 (yaz), 08:30 - 17:00 (kış)',
+    best_time: 'Sabah erken saatler (daha az kalabalık)',
+    visitor_information: 'Ayasuluk Kalesi\'ne yürüme mesafesindedir, ikisini aynı gün ziyaret etmek pratiktir.',
+    images: [],
+    latitude: 37.951,
+    longitude: 27.3685,
+    status: 'published',
+    seo_title: '',
+    seo_description: '',
+  });
+
+  await pool.query('UPDATE settings SET sample_destinations_seeded = 1 WHERE id = 1');
+  console.log(
+    `[db] Seeded 1 sample preview destination (with 2 attractions: ${ayasuluk.slug}, ${stJohnsSlug}). Delete them from Admin > Destinations / Admin > Attractions whenever you like — they will not be recreated.`
+  );
+}
+
 async function init() {
   await pool.query('SELECT 1'); // fail fast with a clear error if DB_* is wrong
   await createSchema();
@@ -1833,6 +2196,7 @@ async function init() {
   await seedSampleContentIfNeeded();
   await seedSampleTransferIfNeeded();
   await seedSampleSmallGroupTourIfNeeded();
+  await seedSampleDestinationsIfNeeded();
 }
 
 module.exports = {
@@ -1842,6 +2206,8 @@ module.exports = {
   transferRoutes,
   availability,
   blogPosts,
+  destinations,
+  attractions,
   contactMessages,
   mediaFolders,
   mediaItems,
