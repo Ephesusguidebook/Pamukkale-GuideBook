@@ -17,6 +17,7 @@ const emptyItem = {
   vehicle_tiers: [],
   fixed_costs: [],
   optional_costs: [],
+  is_featured: false,
   seo_title: '',
   seo_description: '',
 };
@@ -47,6 +48,7 @@ export default function AdminTransferForm() {
           vehicle_tiers: t.vehicle_tiers || [],
           fixed_costs: t.fixed_costs || [],
           optional_costs: t.optional_costs || [],
+          is_featured: !!t.is_featured,
         });
       })
       .catch(() => setError('Could not load this transfer route.'))
@@ -203,6 +205,20 @@ export default function AdminTransferForm() {
               <option value="GBP">GBP</option>
             </select>
           </div>
+          <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-gray-200 p-3">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={form.is_featured}
+              onChange={(e) => update('is_featured', e.target.checked)}
+            />
+            <span>
+              <span className="block text-sm font-medium text-gray-800">Featured on homepage</span>
+              <span className="block text-xs text-gray-500">
+                Shows this route in the "Transfers" section on the homepage.
+              </span>
+            </span>
+          </label>
         </div>
 
         <div className="card space-y-3 p-6">

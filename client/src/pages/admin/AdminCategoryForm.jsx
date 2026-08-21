@@ -36,6 +36,7 @@ const emptyItem = {
   // Faz 3 — Private (cost/pricing engine, per-passenger vehicle+markup) or
   // Small Group (flat guaranteed-departure price, no markup).
   booking_type: 'private',
+  is_featured: false,
   seo_title: '',
   seo_description: '',
 };
@@ -87,6 +88,7 @@ export default function AdminCategoryForm({ category }) {
           fixed_costs: t.fixed_costs || [],
           optional_costs: t.optional_costs || [],
           booking_type: t.booking_type === 'small_group' ? 'small_group' : 'private',
+          is_featured: !!t.is_featured,
           languages: t.languages || [],
           highlights: t.highlights || [],
           included: t.included || [],
@@ -229,6 +231,20 @@ export default function AdminCategoryForm({ category }) {
               onChange={(e) => update('description', e.target.value)}
             />
           </div>
+          <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-gray-200 p-3">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={form.is_featured}
+              onChange={(e) => update('is_featured', e.target.checked)}
+            />
+            <span>
+              <span className="block text-sm font-medium text-gray-800">Featured on homepage</span>
+              <span className="block text-xs text-gray-500">
+                Shows this tour in the "Popular Tours" section on the homepage.
+              </span>
+            </span>
+          </label>
           <div>
             <label className="label">Languages (comma-separated — e.g. EN, TR, ES)</label>
             <input

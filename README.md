@@ -113,6 +113,9 @@ Departure Point are set on its edit form under Admin > Tours.
   rate, can request a booking, register their travelers' passport details per booking, and
   read a running "Ön Muhasebe" account statement the admin maintains. See "Agency Portal"
   below for the full breakdown.
+- **Home page** (`/`): Intro + "Tour Starting Points" (Destinations) + a hand-picked
+  "Popular Tours" spotlight + the existing per-type sections + a hand-picked "Transfers"
+  spotlight + "From the Blog". See "Home Page" below for how each section is populated.
 - **Not yet included:** online payment / real booking inventory (currently both Tours and
   Transfer submit a booking request pre-filled with the full selection as a contact-message
   enquiry, landing in Admin > Messages) — the data model is structured so a booking +
@@ -451,6 +454,26 @@ against an `/agency` route, even though both are signed with the same secret.
 - Not included yet: file upload for a scanned passport copy (the registry above is
   text fields only — name, number, dates), and per-booking online payment (same "Not yet
   included" note as Tours/Transfer above applies here too).
+
+## Home Page
+
+The home page is built from several independent sections, each hidden automatically when
+it has nothing to show:
+
+- **Intro** — an admin-editable H1 + paragraph (Admin > Page Content > Home, same as
+  before), on a plain background (no colored hero band). A paragraph longer than 150
+  characters is cut with a "Read More" toggle so the section never grows too tall.
+- **Tour Starting Points** — up to 6 cards reusing the Destinations content type (image +
+  title, linking to its Destination page). Add/edit these from **Admin > Destinations**.
+- **Popular Tours** — up to 6 hand-picked tours. Check **"Featured on homepage"** on a
+  tour's edit screen (Admin > Tours) to add it here; nothing shows until at least one tour
+  is marked.
+- **Package Tours / Daily Tours / Activities** — unchanged: the first 3 published tours of
+  each type, same as before this update.
+- **Transfers** — up to 6 hand-picked transfer routes (2 rows of 3), each showing
+  pick-up → drop-off, duration, and a live "from" price. Check **"Featured on homepage"**
+  on a route's edit screen (Admin > Transfers) to add it here.
+- **From the Blog** — unchanged: the latest 3 posts.
 
 ## Demo Content
 

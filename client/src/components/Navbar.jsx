@@ -12,6 +12,7 @@ const COMPANY_LINKS = [
   { to: '/terms-and-conditions', label: 'Terms and Conditions' },
   { to: '/privacy-policy', label: 'Privacy Policy' },
   { to: '/faq', label: 'FAQ' },
+  { to: '/agency/login', label: 'Agency Login' },
 ];
 
 export default function Navbar() {

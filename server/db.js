@@ -88,6 +88,7 @@ const SCHEMA_STATEMENTS = [
     fixed_costs JSON,
     optional_costs JSON,
     booking_type VARCHAR(20) NOT NULL DEFAULT 'private',
+    is_featured TINYINT(1) NOT NULL DEFAULT 0,
     seo_title VARCHAR(255) NOT NULL DEFAULT '',
     seo_description VARCHAR(500) NOT NULL DEFAULT '',
     created_at VARCHAR(40) NOT NULL,
@@ -111,6 +112,7 @@ const SCHEMA_STATEMENTS = [
     vehicle_tiers JSON,
     fixed_costs JSON,
     optional_costs JSON,
+    is_featured TINYINT(1) NOT NULL DEFAULT 0,
     seo_title VARCHAR(255) NOT NULL DEFAULT '',
     seo_description VARCHAR(500) NOT NULL DEFAULT '',
     created_at VARCHAR(40) NOT NULL,
@@ -432,6 +434,12 @@ async function runColumnMigrations() {
   // Contact page redesign — an admin-editable "response time" line (e.g.
   // "Within 24 hours") alongside the existing contact_email/phone/address.
   await ensureColumn('settings', 'contact_response_time', "VARCHAR(255) NOT NULL DEFAULT ''");
+
+  // Home page redesign — "Featured" flag lets the admin hand-pick which
+  // Tours/Transfer Routes show in the homepage's "Popular Tours" and
+  // "Transfers" sections, instead of those sections being auto-populated.
+  await ensureColumn('tours', 'is_featured', 'TINYINT(1) NOT NULL DEFAULT 0');
+  await ensureColumn('transfer_routes', 'is_featured', 'TINYINT(1) NOT NULL DEFAULT 0');
 }
 
 // --- One-time migration: server/data.json -> MySQL ---
@@ -838,9 +846,9 @@ const tours = {
       `INSERT INTO tours (slug, type, departure_point, title, summary, description, price, original_price,
          price_note, currency, duration_days, location, start_date, capacity, status, cover_image,
          languages, highlights, included, excluded, images, itinerary, route,
-         vehicle_tiers, fixed_costs, optional_costs, booking_type, seo_title, seo_description,
+         vehicle_tiers, fixed_costs, optional_costs, booking_type, is_featured, seo_title, seo_description,
          created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         input.slug,
         TOUR_TYPES.includes(input.type) ? input.type : 'package',
@@ -869,6 +877,7 @@ const tours = {
         j(normalizeFixedCosts(input.fixed_costs)),
         j(normalizeOptionalCosts(input.optional_costs)),
         BOOKING_TYPES.includes(input.booking_type) ? input.booking_type : 'private',
+        input.is_featured ? 1 : 0,
         input.seo_title || '',
         input.seo_description || '',
         now,
@@ -885,8 +894,8 @@ const tours = {
          price = ?, original_price = ?, price_note = ?, currency = ?, duration_days = ?, location = ?,
          start_date = ?, capacity = ?, status = ?, cover_image = ?, languages = ?, highlights = ?,
          included = ?, excluded = ?, images = ?, itinerary = ?, route = ?,
-         vehicle_tiers = ?, fixed_costs = ?, optional_costs = ?, booking_type = ?, seo_title = ?,
-         seo_description = ?, updated_at = ? WHERE id = ?`,
+         vehicle_tiers = ?, fixed_costs = ?, optional_costs = ?, booking_type = ?, is_featured = ?,
+         seo_title = ?, seo_description = ?, updated_at = ? WHERE id = ?`,
       [
         input.slug || existing.slug,
         TOUR_TYPES.includes(input.type) ? input.type : 'package',
@@ -915,6 +924,7 @@ const tours = {
         j(normalizeFixedCosts(input.fixed_costs)),
         j(normalizeOptionalCosts(input.optional_costs)),
         BOOKING_TYPES.includes(input.booking_type) ? input.booking_type : 'private',
+        input.is_featured ? 1 : 0,
         input.seo_title || '',
         input.seo_description || '',
         nowIso(),
@@ -978,8 +988,8 @@ const transferRoutes = {
     const [result] = await pool.query(
       `INSERT INTO transfer_routes (slug, title, pickup_location, dropoff_location, duration_text,
          distance_km, summary, description, currency, status, vehicle_tiers, fixed_costs, optional_costs,
-         seo_title, seo_description, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         is_featured, seo_title, seo_description, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         input.slug,
         input.title || '',
@@ -994,6 +1004,7 @@ const transferRoutes = {
         j(normalizeVehicleTiers(input.vehicle_tiers)),
         j(normalizeFixedCosts(input.fixed_costs)),
         j(normalizeOptionalCosts(input.optional_costs)),
+        input.is_featured ? 1 : 0,
         input.seo_title || '',
         input.seo_description || '',
         now,
@@ -1008,8 +1019,8 @@ const transferRoutes = {
     await pool.query(
       `UPDATE transfer_routes SET slug = ?, title = ?, pickup_location = ?, dropoff_location = ?,
          duration_text = ?, distance_km = ?, summary = ?, description = ?, currency = ?, status = ?,
-         vehicle_tiers = ?, fixed_costs = ?, optional_costs = ?, seo_title = ?, seo_description = ?,
-         updated_at = ? WHERE id = ?`,
+         vehicle_tiers = ?, fixed_costs = ?, optional_costs = ?, is_featured = ?, seo_title = ?,
+         seo_description = ?, updated_at = ? WHERE id = ?`,
       [
         input.slug || existing.slug,
         input.title || '',
@@ -1024,6 +1035,7 @@ const transferRoutes = {
         j(normalizeVehicleTiers(input.vehicle_tiers)),
         j(normalizeFixedCosts(input.fixed_costs)),
         j(normalizeOptionalCosts(input.optional_costs)),
+        input.is_featured ? 1 : 0,
         input.seo_title || '',
         input.seo_description || '',
         nowIso(),
