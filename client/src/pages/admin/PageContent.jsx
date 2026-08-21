@@ -10,6 +10,7 @@ const PAGES = [
   { key: 'terms', label: 'Terms and Conditions' },
   { key: 'privacy', label: 'Privacy Policy' },
   { key: 'faq', label: 'FAQ' },
+  { key: 'agencyLogin', label: 'Agency Login' },
 ];
 
 export default function PageContent() {

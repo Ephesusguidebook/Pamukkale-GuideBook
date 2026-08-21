@@ -1950,6 +1950,12 @@ const PAGE_CONTENT_DEFAULTS = {
     seo_title: '',
     seo_description: '',
   },
+  agencyLogin: {
+    h1: 'Your Local Operator in the Ephesus Region',
+    p: 'We partner with overseas travel agencies to run their operations in Turkey — handling Tours, Hotels, Transfers and Shore Excursions across the Ephesus region so you can focus on selling, not logistics.',
+    seo_title: '',
+    seo_description: '',
+  },
 };
 
 const pageContent = {

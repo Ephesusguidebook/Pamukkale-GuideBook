@@ -425,6 +425,14 @@ JWT auth realm, its own token storage in the browser, its own layout and nav. An
 token can never be used against an `/admin` route and an admin token can never be used
 against an `/agency` route, even though both are signed with the same secret.
 
+- **`/agency/login` is a pitch page, not just a form.** Above the login form itself, it
+  leads with an admin-editable headline + paragraph (Admin > Page Content > Agency Login,
+  same H1/paragraph pattern used on Home/Contact/etc.) and a 4-icon row for the services
+  offered (Tours, Hotels, Transfers, Shore Excursions), aimed at overseas agencies
+  considering us as their Turkey/Ephesus-region operator. A "How It Works" column explains
+  the (admin-only) onboarding process and links to Contact for agencies that don't have a
+  login yet.
+
 - **Registration is admin-only.** There is no public sign-up form — you register each
   agency yourself from **Admin > Agencies** (company/contact info, login email + password,
   an optional per-agency markup % override, and Active/Suspended status). Suspending an
