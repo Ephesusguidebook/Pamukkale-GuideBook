@@ -7,12 +7,16 @@ const asyncHandler = require('../lib/asyncHandler');
 const router = express.Router();
 
 // POST /api/contact - public, contact / enquiry form
+// Also used by the Agency Login page's "Become a Partner" inline form,
+// which collects a phone number but no email — so this only requires a
+// name plus at least one way to reach the sender back (email or phone),
+// rather than always requiring email.
 router.post(
   '/',
   asyncHandler(async (req, res) => {
     const b = req.body || {};
-    if (!b.name || !b.email) {
-      return res.status(400).json({ error: 'Name and email are required.' });
+    if (!b.name || (!b.email && !b.phone)) {
+      return res.status(400).json({ error: 'Name and either an email or phone number are required.' });
     }
     const message = await db.contactMessages.create(b);
     res.status(201).json({ ok: true });

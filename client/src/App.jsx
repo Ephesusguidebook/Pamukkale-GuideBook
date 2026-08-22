@@ -142,7 +142,7 @@ export default function App() {
           <Route path="page-content" element={<PageContent />} />
         </Route>
 
-        <Route path="/agency/login" element={<AgencyLogin />} />
+        <Route path="/agency/login" element={<PublicLayout><AgencyLogin /></PublicLayout>} />
         <Route
           path="/agency"
           element={

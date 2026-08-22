@@ -206,6 +206,8 @@ const SCHEMA_STATEMENTS = [
     phone VARCHAR(50) NOT NULL DEFAULT '',
     message TEXT,
     status VARCHAR(20) NOT NULL DEFAULT 'new',
+    company_name VARCHAR(255) NULL,
+    company_website VARCHAR(255) NULL,
     created_at VARCHAR(40) NOT NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 
@@ -447,6 +449,14 @@ async function runColumnMigrations() {
   // Attractions already have, now also on Tours, so a Destination page can
   // list the Tours that take place there.
   await ensureColumn('tours', 'destination_id', 'INT NULL');
+
+  // Agency Login "Become a Partner" inline inquiry form — the partner form
+  // collects a company name/website that the generic contact form doesn't,
+  // so contact_messages grows two nullable columns rather than a whole new
+  // table (everything else about a partner lead — name, phone, message,
+  // status, admin visibility — already fits the existing shape).
+  await ensureColumn('contact_messages', 'company_name', 'VARCHAR(255) NULL');
+  await ensureColumn('contact_messages', 'company_website', 'VARCHAR(255) NULL');
 }
 
 // --- One-time migration: server/data.json -> MySQL ---
@@ -1751,17 +1761,32 @@ const contactMessages = {
     const created_at = nowIso();
     const item_type = ITEM_COLLECTIONS[input.item_type] ? input.item_type : null;
     const item_id = input.item_id ? Number(input.item_id) : null;
+    const company_name = input.company_name ? String(input.company_name) : null;
+    const company_website = input.company_website ? String(input.company_website) : null;
     const [result] = await pool.query(
-      `INSERT INTO contact_messages (item_type, item_id, name, email, phone, message, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'new', ?)`,
-      [item_type, item_id, input.name, input.email, input.phone || '', input.message || '', created_at]
+      `INSERT INTO contact_messages (item_type, item_id, name, email, phone, message, status, company_name, company_website, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'new', ?, ?, ?)`,
+      [item_type, item_id, input.name, input.email || '', input.phone || '', input.message || '', company_name, company_website, created_at]
     );
     let item_title = null;
     if (item_id && item_type) {
       const item = await ITEM_COLLECTIONS[item_type]().getById(item_id);
       item_title = item ? item.title : null;
     }
-    return { id: result.insertId, item_type, item_id, name: input.name, email: input.email, phone: input.phone || '', message: input.message || '', status: 'new', created_at, item_title };
+    return {
+      id: result.insertId,
+      item_type,
+      item_id,
+      name: input.name,
+      email: input.email || '',
+      phone: input.phone || '',
+      message: input.message || '',
+      status: 'new',
+      company_name,
+      company_website,
+      created_at,
+      item_title,
+    };
   },
   async listWithItemTitle() {
     const rows = await query('SELECT * FROM contact_messages ORDER BY created_at DESC');
@@ -1972,6 +1997,16 @@ const PAGE_CONTENT_DEFAULTS = {
   agencyLogin: {
     h1: 'Your Local Operator in the Ephesus Region',
     p: 'We partner with overseas travel agencies to run their operations in Turkey — handling Tours, Hotels, Transfers and Shore Excursions across the Ephesus region so you can focus on selling, not logistics.',
+    seo_title: '',
+    seo_description: '',
+  },
+  // Homepage "Tour Starting Points" section (the destination card grid).
+  // Only h1/p are used — this section lives inside the Home page, not on
+  // its own URL, so it has no SEO fields of its own (Home's SEO Title/
+  // Description above already covers the whole page).
+  homeTourStart: {
+    h1: 'Tour Starting Points',
+    p: '',
     seo_title: '',
     seo_description: '',
   },

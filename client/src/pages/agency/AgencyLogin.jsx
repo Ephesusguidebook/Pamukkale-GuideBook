@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAgencyAuth } from '../../AgencyAuthContext';
 import { usePageContent } from '../../PageContentContext';
+import PartnerInquiryForm from '../../components/PartnerInquiryForm';
 import useSeo from '../../lib/useSeo';
 
 // Simple stroke icons, same visual language as the ones on the Contact page
@@ -154,11 +155,7 @@ export default function AgencyLogin() {
               </li>
             </ol>
             <p className="mt-8 text-sm text-gray-500">
-              New partner agency?{' '}
-              <Link to="/contact" className="font-semibold text-teal-700 hover:underline">
-                Contact us
-              </Link>{' '}
-              to get set up.
+              New partner agency? Fill out the form below and we'll get in touch.
             </p>
           </div>
 
@@ -193,6 +190,22 @@ export default function AgencyLogin() {
                 {loading ? 'Logging in...' : 'Log In'}
               </button>
             </form>
+          </div>
+        </div>
+      </section>
+
+      {/* --- Become a Partner: inline inquiry form, replaces the old link
+          out to the general Contact page --- */}
+      <section className="bg-gray-50">
+        <div className="mx-auto max-w-3xl px-4 py-14 sm:px-6">
+          <div className="text-center">
+            <h2 className="text-xl font-bold text-gray-900">Become a Partner</h2>
+            <p className="mt-2 text-sm text-gray-500">
+              New partner agency? Tell us about your company and we'll get your account set up.
+            </p>
+          </div>
+          <div className="mt-8">
+            <PartnerInquiryForm />
           </div>
         </div>
       </section>

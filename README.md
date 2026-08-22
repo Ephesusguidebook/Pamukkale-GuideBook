@@ -433,13 +433,25 @@ JWT auth realm, its own token storage in the browser, its own layout and nav. An
 token can never be used against an `/admin` route and an admin token can never be used
 against an `/agency` route, even though both are signed with the same secret.
 
-- **`/agency/login` is a pitch page, not just a form.** Above the login form itself, it
-  leads with an admin-editable headline + paragraph (Admin > Page Content > Agency Login,
-  same H1/paragraph pattern used on Home/Contact/etc.) and a 4-icon row for the services
-  offered (Tours, Hotels, Transfers, Shore Excursions), aimed at overseas agencies
-  considering us as their Turkey/Ephesus-region operator. A "How It Works" column explains
-  the (admin-only) onboarding process and links to Contact for agencies that don't have a
-  login yet.
+- **`/agency/login` is a pitch page, not just a form.** It now renders inside the same
+  `PublicLayout` as every other public page (top navbar, footer, WhatsApp button — it was
+  previously an orphaned route with none of those), with a "Agency Login" entry under the
+  navbar's **Company** dropdown. Above the login form itself, it leads with an
+  admin-editable headline + paragraph (Admin > Page Content > Agency Login, same
+  H1/paragraph pattern used on Home/Contact/etc.) and a 4-icon row for the services offered
+  (Tours, Hotels, Transfers, Shore Excursions), aimed at overseas agencies considering us as
+  their Turkey/Ephesus-region operator. A "How It Works" column explains the (admin-only)
+  onboarding process.
+- **"Become a Partner" inline inquiry form**, below the How It Works / Login section —
+  replaces the old link out to the general Contact page. Collects Company Name (required),
+  Company Website, Contact Person Name (required), Phone (required) and Message (required);
+  submits to the same `POST /api/contact` endpoint and `contact_messages` table the regular
+  Contact form uses (two extra nullable columns, `company_name`/`company_website`, were
+  added for it), so every submission shows up under **Admin > Messages** immediately,
+  tagged with an amber "Partner Inquiry" badge and a clickable company website link. Because
+  this form has no email field, `POST /api/contact` now accepts either an email or a phone
+  number (previously email was always required) — the regular Contact form is unaffected
+  since it still always collects both.
 
 - **Registration is admin-only.** There is no public sign-up form — you register each
   agency yourself from **Admin > Agencies** (company/contact info, login email + password,
@@ -480,7 +492,11 @@ it has nothing to show:
   before), on a plain background (no colored hero band). A paragraph longer than 150
   characters is cut with a "Read More" toggle so the section never grows too tall.
 - **Tour Starting Points** — up to 6 cards reusing the Destinations content type (image +
-  title, linking to its Destination page). Add/edit these from **Admin > Destinations**.
+  title, linking to its Destination page). Add/edit these from **Admin > Destinations**. The
+  section's own headline and an optional paragraph underneath it are admin-editable at
+  **Admin > Page Content > Home – "Tour Starting Points" section** (no SEO fields there —
+  it's a section inside the Home page, not its own URL, so Home's own SEO Title/Description
+  above already covers it).
 - **Popular Tours** — up to 6 hand-picked tours. Check **"Featured on homepage"** on a
   tour's edit screen (Admin > Tours) to add it here; nothing shows until at least one tour
   is marked.

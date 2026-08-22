@@ -20,11 +20,15 @@ async function sendContactNotification(to, message) {
   if (!transporter || !to) return;
 
   const from = process.env.SMTP_FROM || process.env.SMTP_USER;
-  const subject = `New enquiry from ${message.name}`;
+  const subject = message.company_name
+    ? `New partner inquiry from ${message.company_name}`
+    : `New enquiry from ${message.name}`;
   const lines = [
     `Name: ${message.name}`,
-    `Email: ${message.email}`,
+    message.email ? `Email: ${message.email}` : null,
     message.phone ? `Phone: ${message.phone}` : null,
+    message.company_name ? `Company: ${message.company_name}` : null,
+    message.company_website ? `Website: ${message.company_website}` : null,
     message.item_title ? `Regarding: ${message.item_title}` : null,
     '',
     message.message || '(no message)',
@@ -34,7 +38,7 @@ async function sendContactNotification(to, message) {
     await transporter.sendMail({
       from,
       to,
-      replyTo: message.email,
+      replyTo: message.email || undefined,
       subject,
       text: lines.join('\n'),
     });

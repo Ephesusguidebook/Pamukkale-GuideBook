@@ -90,13 +90,19 @@ function PopularToursSection({ tours }) {
 
 // "Tour Start" — the places tours depart from / are built around, reusing
 // the Destinations content type (image + title + slug) as a visual card grid.
+// Heading + paragraph are admin-editable under Admin > Page Content >
+// "Home – Tour Starting Points section".
 function DestinationStartSection({ items }) {
+  const { h1, p } = usePageContent('homeTourStart', { h1: 'Tour Starting Points', p: '' });
   if (!items || items.length === 0) return null;
   return (
     <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-      <div className="mb-8 flex items-end justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Tour Starting Points</h2>
-        <Link to="/destinations" className="text-sm font-medium text-teal-700 hover:underline">
+      <div className="mb-8 flex items-end justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">{h1}</h2>
+          {p && <p className="mt-1 text-sm text-gray-500">{p}</p>}
+        </div>
+        <Link to="/destinations" className="flex-shrink-0 text-sm font-medium text-teal-700 hover:underline">
           See all →
         </Link>
       </div>

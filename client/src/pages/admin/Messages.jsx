@@ -42,14 +42,40 @@ export default function Messages() {
             className={`card cursor-pointer p-4 ${msg.status === 'new' ? 'border-l-4 border-l-amber-500' : ''}`}
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="font-semibold text-gray-900">{msg.name}</p>
+              <p className="font-semibold text-gray-900">
+                {msg.name}
+                {msg.company_name && (
+                  <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                    Partner Inquiry
+                  </span>
+                )}
+              </p>
               <span className="text-xs text-gray-400">
                 {new Date(msg.created_at).toLocaleString('en-US')}
               </span>
             </div>
             <p className="text-sm text-gray-500">
-              {msg.email} {msg.phone && `· ${msg.phone}`}
+              {[msg.email, msg.phone].filter(Boolean).join(' · ')}
             </p>
+            {msg.company_name && (
+              <p className="mt-1 text-xs font-medium text-gray-700">
+                {msg.company_name}
+                {msg.company_website && (
+                  <>
+                    {' · '}
+                    <a
+                      href={/^https?:\/\//i.test(msg.company_website) ? msg.company_website : `https://${msg.company_website}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-teal-700 hover:underline"
+                    >
+                      {msg.company_website}
+                    </a>
+                  </>
+                )}
+              </p>
+            )}
             {msg.item_title && (
               <p className="mt-1 text-xs font-medium text-teal-700">
                 Regarding: {msg.item_title}
