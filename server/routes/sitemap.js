@@ -53,6 +53,10 @@ router.get(
     publishedRoutes.forEach((r) => entries.push(urlEntry(`${SITE_URL}/transfer/${r.slug}/`, r.updated_at)));
     publishedDestinations.forEach((d) => entries.push(urlEntry(`${SITE_URL}/destinations/${d.slug}/`, d.updated_at)));
     publishedAttractions.forEach((a) => entries.push(urlEntry(`${SITE_URL}/attraction/${a.slug}/`, a.updated_at)));
+    // "/things-to-do/" itself 301-redirects to /destinations/ (not
+    // sitemap-worthy), but each per-destination landing page is a real,
+    // separately-worded SEO page, so it gets its own entry.
+    publishedDestinations.forEach((d) => entries.push(urlEntry(`${SITE_URL}/things-to-do/${d.slug}/`, d.updated_at)));
 
     const xml =
       `<?xml version="1.0" encoding="UTF-8"?>\n` +

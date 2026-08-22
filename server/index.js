@@ -70,6 +70,9 @@ const DETAIL_PREFIXES = [
   { prefix: '/transfer/', collection: () => db.transferRoutes },
   { prefix: '/destinations/', collection: () => db.destinations },
   { prefix: '/attraction/', collection: () => db.attractions },
+  // "/things-to-do/:slug" is a per-Destination SEO landing page, so it's
+  // "known" under the exact same condition as "/destinations/:slug".
+  { prefix: '/things-to-do/', collection: () => db.destinations },
 ];
 
 // /tours URL scheme: /tours, /tours/:type, /tours/from-:departure,
@@ -190,6 +193,11 @@ app.get('*', async (req, res, next) => {
   }
   next();
 });
+
+// "/things-to-do/" is a per-Destination SEO landing page ("/things-to-do/:slug"),
+// so the bare collection path (no slug) has nothing of its own to show —
+// permanently redirect it to the Destinations listing instead of a 404.
+app.get('/things-to-do', (req, res) => res.redirect(301, '/destinations'));
 
 // API routes
 app.use('/api/tours', toursRouter);

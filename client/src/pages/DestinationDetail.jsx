@@ -172,8 +172,15 @@ export default function DestinationDetail() {
 
       {tours.length > 0 && (
         <div className="mt-10">
-          <h2 className="text-xl font-bold text-gray-900">Things To Do</h2>
-          <p className="mt-1 text-sm text-gray-500">Tours you can book in and around {item.title}.</p>
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Things To Do</h2>
+              <p className="mt-1 text-sm text-gray-500">Tours you can book in and around {item.title}.</p>
+            </div>
+            <Link to={`/things-to-do/${item.slug}`} className="text-sm font-medium text-teal-700 hover:underline">
+              See all things to do in {item.title} →
+            </Link>
+          </div>
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {tours.map((t) => (
               <TourCard key={t.id} tour={t} basePath="/tours" />

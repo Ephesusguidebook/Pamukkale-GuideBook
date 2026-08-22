@@ -37,6 +37,11 @@ export default function Footer() {
                   Attractions
                 </Link>
               </li>
+              <li>
+                <Link to="/things-to-do" className="hover:text-teal-700">
+                  Things To Do
+                </Link>
+              </li>
             </ul>
           </div>
           <div>

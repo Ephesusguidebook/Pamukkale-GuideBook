@@ -30,6 +30,9 @@ MySQL Databases, or run your own MySQL/MariaDB server locally).
 /transfer/[slug]/              → Transfer route detail + booking widget
 /destinations/                 → Destinations listing
 /destinations/[slug]/          → Destination detail (Attractions, Gallery, FAQ)
+/things-to-do/                 → 301 redirect → /destinations/ (not a page)
+/things-to-do/[slug]/          → Things To Do — SEO landing page + tour discovery hub
+                                  for a Destination (footer link only, not in top navbar)
 /attraction/                   → Attractions listing (filterable by destination)
 /attraction/[slug]/            → Attraction detail (fees, hours, map, nearby)
 /blog/                         → Blog listing
@@ -429,6 +432,19 @@ pages that link back into the rest of the site.
   when lat/lng are set) plus a `BreadcrumbList`. Entrance fees are shown as plain page text
   rather than forced into a structured price/offer, since the field is free text (e.g. "€4
   (yaklaşık)") and fabricating structured pricing from it would risk invalid data.
+- **Things To Do (`/things-to-do/:slug`)**: a dedicated SEO landing page + tour discovery hub
+  per Destination — deliberately not a second copy of the Tours catalog. It reuses the same
+  `GET /api/destinations/:slug` data as the Destination detail page (tours, attractions, and
+  now transfer routes matched to that destination by pickup/dropoff location text) but leads
+  with its own H1 + intro paragraph, then: Tour cards, a "Must-See Places" block listing that
+  destination's Attractions by name only (plain text links, no cards), then a "Transfers"
+  block listing matching Transfer routes the same way. It is intentionally left out of the top
+  navbar and only linked from the Footer's Tours column, plus a "See all things to do in
+  [Destination] →" link on the Destination detail page's own "Things To Do" section. The bare
+  `/things-to-do` path is a permanent (301) server-side redirect to `/destinations`, not a
+  page of its own, so it carries no duplicate/thin-content SEO weight — only the per-destination
+  pages are indexable, and each gets its own `sitemap.xml` entry (`CollectionPage` +
+  `BreadcrumbList` JSON-LD).
 
 ## Agency Portal (B2B)
 

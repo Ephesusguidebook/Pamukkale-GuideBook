@@ -21,6 +21,7 @@ import BlogList from './pages/BlogList';
 import BlogDetail from './pages/BlogDetail';
 import Destinations from './pages/Destinations';
 import DestinationDetail from './pages/DestinationDetail';
+import ThingsToDo from './pages/ThingsToDo';
 import Attractions from './pages/Attractions';
 import AttractionDetail from './pages/AttractionDetail';
 import AboutUs from './pages/AboutUs';
@@ -93,6 +94,10 @@ export default function App() {
 
         <Route path="/destinations" element={<PublicLayout><Destinations /></PublicLayout>} />
         <Route path="/destinations/:slug" element={<PublicLayout><DestinationDetail /></PublicLayout>} />
+
+        {/* "/things-to-do" (bare) 301-redirects server-side to /destinations
+            (see server/index.js) — only the per-destination page is a client route. */}
+        <Route path="/things-to-do/:slug" element={<PublicLayout><ThingsToDo /></PublicLayout>} />
 
         <Route path="/attraction" element={<PublicLayout><Attractions /></PublicLayout>} />
         <Route path="/attraction/:slug" element={<PublicLayout><AttractionDetail /></PublicLayout>} />

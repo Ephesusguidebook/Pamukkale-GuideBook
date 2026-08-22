@@ -1092,6 +1092,23 @@ const transferRoutes = {
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   },
+  // Transfer routes have no destination_id relation (pickup/dropoff are
+  // free-text, not linked to a Destination row) — the "/things-to-do/:slug"
+  // page and the Destination detail page both need "transfers involving
+  // this destination", so this matches by plain substring against the
+  // destination's own name instead. Guards against an empty pickup/dropoff
+  // string matching everything (`''.includes()` is always true either way).
+  async listPublishedMatchingText(nameFragment) {
+    const needle = String(nameFragment || '').trim().toLowerCase();
+    if (!needle) return [];
+    const rows = await transferRoutes.listPublished();
+    return rows.filter((r) => {
+      const pickup = String(r.pickup_location || '').trim().toLowerCase();
+      const dropoff = String(r.dropoff_location || '').trim().toLowerCase();
+      const matches = (loc) => !!loc && (loc.includes(needle) || needle.includes(loc));
+      return matches(pickup) || matches(dropoff);
+    });
+  },
 };
 
 // --- Availability (Faz 6 — Transfer Routes; reusable later for Tours) ---
