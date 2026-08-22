@@ -89,12 +89,14 @@ const SCHEMA_STATEMENTS = [
     optional_costs JSON,
     booking_type VARCHAR(20) NOT NULL DEFAULT 'private',
     is_featured TINYINT(1) NOT NULL DEFAULT 0,
+    destination_id INT NULL,
     seo_title VARCHAR(255) NOT NULL DEFAULT '',
     seo_description VARCHAR(500) NOT NULL DEFAULT '',
     created_at VARCHAR(40) NOT NULL,
     updated_at VARCHAR(40) NOT NULL,
     INDEX idx_tours_status (status),
-    INDEX idx_tours_type (type)
+    INDEX idx_tours_type (type),
+    INDEX idx_tours_destination (destination_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 
   `CREATE TABLE IF NOT EXISTS transfer_routes (
@@ -440,6 +442,11 @@ async function runColumnMigrations() {
   // "Transfers" sections, instead of those sections being auto-populated.
   await ensureColumn('tours', 'is_featured', 'TINYINT(1) NOT NULL DEFAULT 0');
   await ensureColumn('transfer_routes', 'is_featured', 'TINYINT(1) NOT NULL DEFAULT 0');
+
+  // Destination detail page "Things To Do" — same destination_id link
+  // Attractions already have, now also on Tours, so a Destination page can
+  // list the Tours that take place there.
+  await ensureColumn('tours', 'destination_id', 'INT NULL');
 }
 
 // --- One-time migration: server/data.json -> MySQL ---
@@ -846,9 +853,9 @@ const tours = {
       `INSERT INTO tours (slug, type, departure_point, title, summary, description, price, original_price,
          price_note, currency, duration_days, location, start_date, capacity, status, cover_image,
          languages, highlights, included, excluded, images, itinerary, route,
-         vehicle_tiers, fixed_costs, optional_costs, booking_type, is_featured, seo_title, seo_description,
-         created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         vehicle_tiers, fixed_costs, optional_costs, booking_type, is_featured, destination_id,
+         seo_title, seo_description, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         input.slug,
         TOUR_TYPES.includes(input.type) ? input.type : 'package',
@@ -878,6 +885,7 @@ const tours = {
         j(normalizeOptionalCosts(input.optional_costs)),
         BOOKING_TYPES.includes(input.booking_type) ? input.booking_type : 'private',
         input.is_featured ? 1 : 0,
+        input.destination_id ? Number(input.destination_id) : null,
         input.seo_title || '',
         input.seo_description || '',
         now,
@@ -895,7 +903,7 @@ const tours = {
          start_date = ?, capacity = ?, status = ?, cover_image = ?, languages = ?, highlights = ?,
          included = ?, excluded = ?, images = ?, itinerary = ?, route = ?,
          vehicle_tiers = ?, fixed_costs = ?, optional_costs = ?, booking_type = ?, is_featured = ?,
-         seo_title = ?, seo_description = ?, updated_at = ? WHERE id = ?`,
+         destination_id = ?, seo_title = ?, seo_description = ?, updated_at = ? WHERE id = ?`,
       [
         input.slug || existing.slug,
         TOUR_TYPES.includes(input.type) ? input.type : 'package',
@@ -925,6 +933,7 @@ const tours = {
         j(normalizeOptionalCosts(input.optional_costs)),
         BOOKING_TYPES.includes(input.booking_type) ? input.booking_type : 'private',
         input.is_featured ? 1 : 0,
+        input.destination_id ? Number(input.destination_id) : null,
         input.seo_title || '',
         input.seo_description || '',
         nowIso(),
@@ -936,6 +945,16 @@ const tours = {
   async remove(id) {
     const [result] = await pool.query('DELETE FROM tours WHERE id = ?', [Number(id)]);
     return result.affectedRows > 0;
+  },
+  // "Things To Do" on a Destination detail page — the Tours an admin has
+  // linked to that destination, same destination_id relation Attractions
+  // already use.
+  async listPublishedByDestination(destinationId) {
+    const rows = await query(
+      "SELECT * FROM tours WHERE destination_id = ? AND status = 'published' ORDER BY created_at DESC",
+      [Number(destinationId)]
+    );
+    return rows.map(rowToTour);
   },
   async listPublishedByFilter({ type, departureSlug: depSlug } = {}) {
     const all = await tours.listPublished();

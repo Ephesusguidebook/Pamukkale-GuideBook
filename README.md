@@ -402,7 +402,13 @@ pages that link back into the rest of the site.
   for the map.
 - **Public `/destinations/:slug` page**: Title, Paragraph 1, Visitor Information, an
   "Attractions" section of clickable cards for every published Attraction under that
-  Destination, a Photo Gallery, and an FAQ accordion.
+  Destination, a "Things To Do" section of tour cards (see below), a Photo Gallery, and an
+  FAQ accordion.
+- **Things To Do**: a Tour can optionally be linked to a Destination too — pick one from the
+  new **Destination (Things To Do)** dropdown on a tour's edit screen (Admin > Tours), same
+  relation Attractions already have. Linked tours show up as cards in the "Things To Do"
+  section on that Destination's page (hidden if none are linked), so a destination page can
+  answer "what tours can I actually book here" alongside its Attractions.
 - **Public `/attraction/:slug` page**: H1, an info bar with Entrance Fee / Opening Hours /
   Best Time / Location (Location links back to the parent Destination automatically), Visitor
   Information, Photo Gallery, a live Google Maps embed (built from Latitude/Longitude — no

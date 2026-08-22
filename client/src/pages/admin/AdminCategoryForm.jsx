@@ -37,6 +37,7 @@ const emptyItem = {
   // Small Group (flat guaranteed-departure price, no markup).
   booking_type: 'private',
   is_featured: false,
+  destination_id: '',
   seo_title: '',
   seo_description: '',
 };
@@ -64,6 +65,14 @@ export default function AdminCategoryForm({ category }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [availabilityMap, setAvailabilityMap] = useState({});
+  const [destinations, setDestinations] = useState([]);
+
+  useEffect(() => {
+    api
+      .get('/admin/destinations')
+      .then((res) => setDestinations(res.data))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     setForm(emptyItem);
@@ -89,6 +98,7 @@ export default function AdminCategoryForm({ category }) {
           optional_costs: t.optional_costs || [],
           booking_type: t.booking_type === 'small_group' ? 'small_group' : 'private',
           is_featured: !!t.is_featured,
+          destination_id: t.destination_id || '',
           languages: t.languages || [],
           highlights: t.highlights || [],
           included: t.included || [],
@@ -212,6 +222,25 @@ export default function AdminCategoryForm({ category }) {
                 → /tours/from-kusadasi). Leave empty if not relevant.
               </p>
             </div>
+          </div>
+          <div>
+            <label className="label">Destination (Things To Do)</label>
+            <select
+              className="input"
+              value={form.destination_id}
+              onChange={(e) => update('destination_id', e.target.value)}
+            >
+              <option value="">No destination</option>
+              {destinations.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.title}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-gray-500">
+              Optional. Shows this tour as a card in the "Things To Do" section on the chosen
+              destination's page.
+            </p>
           </div>
           <div>
             <label className="label">Short Summary</label>

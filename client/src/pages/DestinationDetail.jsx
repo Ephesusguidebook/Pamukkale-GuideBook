@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import api from '../api';
 import FaqAccordion from '../components/FaqAccordion';
+import TourCard from '../components/TourCard';
 import useJsonLd from '../lib/useJsonLd';
 import useSeo from '../lib/useSeo';
 
@@ -90,6 +91,7 @@ export default function DestinationDetail() {
   }
 
   const attractions = item.attractions || [];
+  const tours = item.tours || [];
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
@@ -149,6 +151,18 @@ export default function DestinationDetail() {
                   {a.entrance_fee && <p className="mt-1 text-sm text-gray-500">🎫 {a.entrance_fee}</p>}
                 </div>
               </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tours.length > 0 && (
+        <div className="mt-10">
+          <h2 className="text-xl font-bold text-gray-900">Things To Do</h2>
+          <p className="mt-1 text-sm text-gray-500">Tours you can book in and around {item.title}.</p>
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {tours.map((t) => (
+              <TourCard key={t.id} tour={t} basePath="/tours" />
             ))}
           </div>
         </div>

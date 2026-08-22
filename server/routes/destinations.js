@@ -12,15 +12,18 @@ router.get(
 );
 
 // GET /api/destinations/:slug - the destination itself plus the published
-// Attractions that belong to it (for the "Attractions" card grid on the
-// destination detail page) in one round-trip.
+// Attractions (for the "Attractions" card grid) and Tours (for the "Things
+// To Do" card grid) that belong to it, in one round-trip.
 router.get(
   '/:slug',
   asyncHandler(async (req, res) => {
     const item = await db.destinations.getPublishedBySlug(req.params.slug);
     if (!item) return res.status(404).json({ error: 'Destination not found.' });
-    const attractions = await db.attractions.listPublishedByDestination(item.id);
-    res.json({ ...item, attractions });
+    const [attractions, tours] = await Promise.all([
+      db.attractions.listPublishedByDestination(item.id),
+      db.tours.listPublishedByDestination(item.id),
+    ]);
+    res.json({ ...item, attractions, tours });
   })
 );
 
