@@ -126,61 +126,63 @@ export default function AttractionDetail() {
         <span className="text-gray-700">{item.title}</span>
       </nav>
 
-      {item.cover_image && (
-        <div className="aspect-[21/9] w-full overflow-hidden rounded-2xl bg-gray-100">
-          <img src={item.cover_image} alt={item.title} className="h-full w-full object-cover" />
-        </div>
-      )}
+      <div className={`grid grid-cols-1 gap-8 ${imageUrls.length > 0 ? 'lg:grid-cols-2 lg:items-start' : ''}`}>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">{item.title}</h1>
 
-      <h1 className="mt-8 text-3xl font-bold text-gray-900">{item.title}</h1>
+          <div className="mt-4 grid grid-cols-2 gap-3 rounded-2xl bg-gray-50 p-4 sm:grid-cols-4">
+            <div>
+              <p className="text-xs uppercase text-gray-400">Giriş Ücreti</p>
+              <p className="mt-0.5 text-sm font-semibold text-gray-800">{item.entrance_fee || '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-400">Açık Saatleri</p>
+              <p className="mt-0.5 text-sm font-semibold text-gray-800">{item.opening_hours || '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-400">Best Time</p>
+              <p className="mt-0.5 text-sm font-semibold text-gray-800">{item.best_time || '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-400">Location</p>
+              {item.destination ? (
+                <Link to={`/destinations/${item.destination.slug}`} className="mt-0.5 block text-sm font-semibold text-teal-700 hover:underline">
+                  {item.destination.title}
+                </Link>
+              ) : (
+                <p className="mt-0.5 text-sm font-semibold text-gray-800">—</p>
+              )}
+            </div>
+          </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3 rounded-2xl bg-gray-50 p-4 sm:grid-cols-4">
-        <div>
-          <p className="text-xs uppercase text-gray-400">Giriş Ücreti</p>
-          <p className="mt-0.5 text-sm font-semibold text-gray-800">{item.entrance_fee || '—'}</p>
-        </div>
-        <div>
-          <p className="text-xs uppercase text-gray-400">Açık Saatleri</p>
-          <p className="mt-0.5 text-sm font-semibold text-gray-800">{item.opening_hours || '—'}</p>
-        </div>
-        <div>
-          <p className="text-xs uppercase text-gray-400">Best Time</p>
-          <p className="mt-0.5 text-sm font-semibold text-gray-800">{item.best_time || '—'}</p>
-        </div>
-        <div>
-          <p className="text-xs uppercase text-gray-400">Location</p>
-          {item.destination ? (
-            <Link to={`/destinations/${item.destination.slug}`} className="mt-0.5 block text-sm font-semibold text-teal-700 hover:underline">
-              {item.destination.title}
-            </Link>
-          ) : (
-            <p className="mt-0.5 text-sm font-semibold text-gray-800">—</p>
+          {item.description && (
+            <div className="prose mt-8 max-w-none whitespace-pre-line text-gray-700">{item.description}</div>
           )}
         </div>
-      </div>
 
-      {item.description && (
-        <div className="prose mt-8 max-w-none whitespace-pre-line text-gray-700">{item.description}</div>
-      )}
+        {imageUrls.length > 0 && (
+          <div>
+            <div className="aspect-[4/3] w-full overflow-hidden rounded-2xl bg-gray-100">
+              <img src={imageUrls[0]} alt={item.title} className="h-full w-full object-cover" loading="lazy" />
+            </div>
+            {imageUrls.length > 1 && (
+              <div className="mt-3 flex gap-3">
+                {imageUrls.slice(1, 4).map((url, idx) => (
+                  <div key={idx} className="aspect-square w-1/3 max-w-[9rem] flex-shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                    <img src={url} alt="" className="h-full w-full object-cover" loading="lazy" />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {item.visitor_information && (
         <div className="mt-10 rounded-2xl bg-gray-50 p-6">
           <h2 className="text-lg font-bold text-gray-900">Visitor Information</h2>
           <div className="prose mt-3 max-w-none whitespace-pre-line text-sm text-gray-700">
             {item.visitor_information}
-          </div>
-        </div>
-      )}
-
-      {imageUrls.length > 0 && (
-        <div className="mt-10">
-          <h2 className="text-lg font-bold text-gray-900">Photo Gallery</h2>
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {(item.images || []).map((img, idx) => (
-              <div key={img.id || idx} className="aspect-square overflow-hidden rounded-lg bg-gray-100">
-                <img src={img.url} alt="" className="h-full w-full object-cover" loading="lazy" />
-              </div>
-            ))}
           </div>
         </div>
       )}

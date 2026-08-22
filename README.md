@@ -400,21 +400,23 @@ pages that link back into the rest of the site.
   from a dropdown), summary/description, Entrance Fee / Opening Hours / Best Time (all free
   text, e.g. "€10" or "Free"), Visitor Information, a photo gallery, and Latitude/Longitude
   for the map.
-- **Public `/destinations/:slug` page**: Title, Paragraph 1, Visitor Information, an
+- **Public `/destinations/:slug` page**: a top hero with the Title + Paragraph 1 on the left
+  and the photo gallery on the right (a large first image plus up to 3 thumbnails — hidden
+  entirely, text goes full-width, if no images are set), then Visitor Information, an
   "Attractions" section of clickable cards for every published Attraction under that
-  Destination, a "Things To Do" section of tour cards (see below), a Photo Gallery, and an
-  FAQ accordion.
+  Destination, a "Things To Do" section of tour cards (see below), and an FAQ accordion.
 - **Things To Do**: a Tour can optionally be linked to a Destination too — pick one from the
   new **Destination (Things To Do)** dropdown on a tour's edit screen (Admin > Tours), same
   relation Attractions already have. Linked tours show up as cards in the "Things To Do"
   section on that Destination's page (hidden if none are linked), so a destination page can
   answer "what tours can I actually book here" alongside its Attractions.
-- **Public `/attraction/:slug` page**: H1, an info bar with Entrance Fee / Opening Hours /
-  Best Time / Location (Location links back to the parent Destination automatically), Visitor
-  Information, Photo Gallery, a live Google Maps embed (built from Latitude/Longitude — no
-  Google API key needed), and a "Yakın Konumlar" (Nearby Locations) section showing other
-  Attractions under the same Destination, sorted by actual distance when both have
-  coordinates set.
+- **Public `/attraction/:slug` page**: the same top hero layout as Destinations — H1, the
+  Entrance Fee / Opening Hours / Best Time / Location info bar (Location links back to the
+  parent Destination automatically), and the description on the left; the photo gallery on
+  the right. Below that: Visitor Information, a live Google Maps embed (built from
+  Latitude/Longitude — no Google API key needed), and a "Yakın Konumlar" (Nearby Locations)
+  section showing other Attractions under the same Destination, sorted by actual distance
+  when both have coordinates set.
 - The Destination ↔ Attraction relationship is optional on both sides: an Attraction can be
   created without a Destination (it just won't show a Location or appear on any Destination
   page), and a Destination with no Attractions yet simply omits that section.
