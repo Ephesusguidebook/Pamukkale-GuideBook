@@ -297,7 +297,8 @@ const SCHEMA_STATEMENTS = [
     sample_content_seeded TINYINT(1) NOT NULL DEFAULT 0,
     sample_transfer_seeded TINYINT(1) NOT NULL DEFAULT 0,
     sample_small_group_seeded TINYINT(1) NOT NULL DEFAULT 0,
-    sample_destinations_seeded TINYINT(1) NOT NULL DEFAULT 0
+    sample_destinations_seeded TINYINT(1) NOT NULL DEFAULT 0,
+    sample_extra_content_seeded TINYINT(1) NOT NULL DEFAULT 0
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 
   `CREATE TABLE IF NOT EXISTS page_content (
@@ -457,6 +458,11 @@ async function runColumnMigrations() {
   // status, admin visibility — already fits the existing shape).
   await ensureColumn('contact_messages', 'company_name', 'VARCHAR(255) NULL');
   await ensureColumn('contact_messages', 'company_website', 'VARCHAR(255) NULL');
+
+  // Bulk demo-content fill (Tours/Transfers/Destinations/Attractions/Blog),
+  // requested so every section of a mostly-empty site can be reviewed at
+  // full density before real data goes in. See seedSampleExtraContentIfNeeded.
+  await ensureColumn('settings', 'sample_extra_content_seeded', 'TINYINT(1) NOT NULL DEFAULT 0');
 }
 
 // --- One-time migration: server/data.json -> MySQL ---
@@ -2677,6 +2683,432 @@ async function seedSampleDestinationsIfNeeded() {
   );
 }
 
+// --- One-time bulk demo-content fill ---
+// The four seeds above each add just one or two example items — not enough
+// to see a homepage/listing page at realistic density (curated "Featured"
+// sections stay empty since nothing was marked Featured; type/listing grids
+// show 1-2 cards instead of a full row; there was no blog seed at all). This
+// adds a much larger batch across every content type — 5 more Destinations
+// (+8 Attractions), 6 more Tours (2 per type, all marked Featured), 6 more
+// Transfer Routes (all marked Featured), and 6 Blog posts — so every section
+// of the site can be reviewed full before real content goes in. Same
+// permanent-flag guard pattern as the seeds above (sample_extra_content_seeded):
+// delete anything from the relevant Admin screen whenever real data is
+// ready, it will never be recreated on a later deploy/restart.
+async function seedSampleExtraContentIfNeeded() {
+  await settings.get();
+  const rows = await query('SELECT sample_extra_content_seeded FROM settings WHERE id = 1 LIMIT 1');
+  if (rows[0] && Number(rows[0].sample_extra_content_seeded) > 0) return;
+
+  async function createDestination(input) {
+    let slug = input.slug;
+    for (let i = 2; await destinations.slugExists(slug); i++) slug = `${input.slug}-${i}`;
+    return destinations.create({ ...input, slug });
+  }
+  async function createAttraction(input) {
+    let slug = input.slug;
+    for (let i = 2; await attractions.slugExists(slug); i++) slug = `${input.slug}-${i}`;
+    return attractions.create({ ...input, slug });
+  }
+  async function createTour(input) {
+    const rawSlug = slugify(input.title, { lower: true, strict: true });
+    let slug = isReservedTourSlug(rawSlug) ? `tour-${rawSlug}` : rawSlug;
+    for (let i = 2; (await tours.slugExists(slug)) || isReservedTourSlug(slug); i++) slug = `${rawSlug}-${i}`;
+    return tours.create({ ...input, slug });
+  }
+  async function createRoute(input) {
+    const rawSlug = slugify(input.title, { lower: true, strict: true });
+    let slug = rawSlug;
+    for (let i = 2; await transferRoutes.slugExists(slug); i++) slug = `${rawSlug}-${i}`;
+    return transferRoutes.create({ ...input, slug });
+  }
+  // Placeholder stock photos (picsum.photos), same pattern already used by
+  // server/scripts/seed.js — fetched by each visitor's own browser when a
+  // page renders, so this works regardless of the deploy environment's own
+  // outbound network access. Swap for real photos via Admin > Media Library
+  // whenever real content goes in.
+  function img(seed, w = 1200, h = 800) {
+    return `https://picsum.photos/seed/${seed}/${w}/${h}`;
+  }
+
+  const TR = 'Bu bir örnek/önizleme içeriğidir — gerçek verilerinizi girmeye başladığınızda ilgili admin ekranından silebilirsiniz, tekrar oluşturulmaz.\n\n';
+  const EN = 'This is sample/preview content — delete it from the relevant Admin screen whenever you start entering real data; it will not be recreated.\n\n';
+
+  // --- Destinations (+ Attractions) ---
+  const kusadasi = await createDestination({
+    slug: 'kusadasi',
+    title: 'Kuşadası (Örnek İçerik)',
+    summary: 'Ege sahilinde, kruvaziyer gemilerinin uğrak noktası ve Efes\'e açılan kapı konumundaki tatil kenti.',
+    description: TR + 'Kuşadası, hem plajları hem de Efes Antik Kenti\'ne yakınlığıyla öne çıkan hareketli bir sahil kasabasıdır. Limanı, bölgeyi ziyaret eden kruvaziyer yolcularının en sık kullandığı giriş noktalarından biridir.',
+    visitor_information: 'Şehir merkezi yürüyüş mesafesinde birçok restoran ve alışveriş imkanı sunar. Efes\'e araçla yaklaşık 20 dakika mesafededir.',
+    images: [{ url: img('kusadasi-dest') }],
+    cover_image: img('kusadasi-dest'),
+    faq: [{ question: 'Kuşadası\'ndan Efes\'e ulaşım nasıl?', answer: 'Özel transfer veya günübirlik turlarla yaklaşık 20-25 dakikada ulaşılır.' }],
+    status: 'published', seo_title: '', seo_description: '',
+  });
+  await createAttraction({
+    slug: 'kusadasi-guvercinada',
+    title: 'Güvercinada (Pigeon Island) (Örnek İçerik)',
+    destination_id: kusadasi.id,
+    summary: 'Kuşadası sahiline kısa bir dolgu yol ile bağlı, üzerinde küçük bir Bizans-Ceneviz kalesi bulunan ada.',
+    description: TR + 'Güvercinada, Kuşadası\'nın simgelerinden biridir. Akşam saatlerinde gün batımını izlemek için popüler bir noktadır, ada çevresinde yürüyüş yapılabilir.',
+    entrance_fee: 'Ücretsiz (kale girişi ayrı ücretlidir)', opening_hours: '09:00 - 19:00', best_time: 'Gün batımı',
+    visitor_information: 'Sahil yürüyüş yolundan yürüyerek ulaşılır, araç yoktur.',
+    images: [{ url: img('guvercinada') }],
+    cover_image: img('guvercinada'), latitude: 37.8611, longitude: 27.2528, status: 'published', seo_title: '', seo_description: '',
+  });
+  await createAttraction({
+    slug: 'kusadasi-marina',
+    title: 'Kuşadası Marina (Örnek İçerik)',
+    destination_id: kusadasi.id,
+    summary: 'Yat ve teknelerin bağlandığı, çevresinde kafe ve restoranların bulunduğu modern marina.',
+    description: TR + 'Kuşadası Marina, akşam yürüyüşleri ve deniz manzaralı yemek seçenekleri için tercih edilen bir bölgedir.',
+    entrance_fee: 'Ücretsiz', opening_hours: 'Her zaman açık', best_time: 'Akşam',
+    visitor_information: 'Şehir merkezine yürüme mesafesindedir.',
+    images: [{ url: img('kusadasi-marina') }],
+    cover_image: img('kusadasi-marina'), latitude: 37.8578, longitude: 27.2617, status: 'published', seo_title: '', seo_description: '',
+  });
+
+  const selcuk = await createDestination({
+    slug: 'selcuk',
+    title: 'Selçuk (Örnek İçerik)',
+    summary: 'Efes Antik Kenti\'nin hemen yanı başındaki, Ayasuluk Tepesi ile öne çıkan tarihi ilçe.',
+    description: TR + 'Selçuk, Efes ören yerine en yakın yerleşim olması nedeniyle bölgeyi ziyaret edenlerin merkezi haline gelmiştir. Ayasuluk Kalesi, St. Jean Bazilikası ve Efes Müzesi ilçenin başlıca duraklarıdır.',
+    visitor_information: 'Selçuk tren istasyonu İzmir\'e düzenli seferler sunar. Efes Antik Kenti\'ne araçla 5 dakika mesafededir.',
+    images: [{ url: img('selcuk-dest') }],
+    cover_image: img('selcuk-dest'),
+    faq: [{ question: 'Selçuk\'ta bir gün yeterli mi?', answer: 'Efes, müze ve Ayasuluk Kalesi\'ni kapsamlı gezmek için bir tam gün önerilir.' }],
+    status: 'published', seo_title: '', seo_description: '',
+  });
+  await createAttraction({
+    slug: 'efes-antik-kenti',
+    title: 'Efes Antik Kenti (Örnek İçerik)',
+    destination_id: selcuk.id,
+    summary: 'Dünyanın en iyi korunmuş antik kentlerinden biri; Celsus Kütüphanesi ve Büyük Tiyatro ile ünlü.',
+    description: TR + 'Efes Antik Kenti, Roma döneminden kalma geniş bir ören yeridir. Celsus Kütüphanesi cephesi, Büyük Tiyatro ve Aşkı Yolu (Marmara döşeli ana cadde) en çok ziyaret edilen bölümlerdir.',
+    entrance_fee: '€40 (yaklaşık, Terrace Houses hariç)', opening_hours: '08:00 - 18:30 (yaz), 08:00 - 17:00 (kış)', best_time: 'Sabah erken saatler',
+    visitor_information: 'İki ana giriş kapısı vardır (Üst Kapı ve Alt Kapı); güneşten korunma ve rahat ayakkabı önerilir.',
+    images: [{ url: img('efes-antik-kenti') }],
+    cover_image: img('efes-antik-kenti'), latitude: 37.9395, longitude: 27.3416, status: 'published', seo_title: '', seo_description: '',
+  });
+  await createAttraction({
+    slug: 'efes-muzesi',
+    title: 'Efes Müzesi (Örnek İçerik)',
+    destination_id: selcuk.id,
+    summary: 'Efes kazılarında bulunan heykel, mozaik ve günlük yaşam objelerinin sergilendiği arkeoloji müzesi.',
+    description: TR + 'Selçuk şehir merkezinde yer alan müze, Efes\'te bulunan eserlerin büyük bir kısmını barındırır ve ören yeri ziyaretini tamamlayıcı niteliktedir.',
+    entrance_fee: '€10 (yaklaşık)', opening_hours: '08:30 - 18:00', best_time: 'Öğleden sonra (Efes gezisinden sonra)',
+    visitor_information: 'Selçuk şehir merkezinde, yürüme mesafesinde otopark mevcuttur.',
+    images: [{ url: img('efes-muzesi') }],
+    cover_image: img('efes-muzesi'), latitude: 37.9505, longitude: 27.3667, status: 'published', seo_title: '', seo_description: '',
+  });
+
+  const pamukkaleDest = await createDestination({
+    slug: 'pamukkale',
+    title: 'Pamukkale (Örnek İçerik)',
+    summary: 'Beyaz travertenleri ve antik Hierapolis kentiyle Türkiye\'nin en tanınmış doğal harikalarından biri.',
+    description: TR + 'Pamukkale, kalsiyum karbonat birikintilerinin oluşturduğu beyaz teraslarıyla dünyaca ünlüdür. Traverten alanının hemen üzerinde antik Hierapolis kenti ve Cleopatra Havuzu yer alır.',
+    visitor_information: 'Denizli Çardak Havalimanı\'na yaklaşık 65 km mesafededir. Ziyaret için erken saatler önerilir.',
+    images: [{ url: img('pamukkale-dest') }],
+    cover_image: img('pamukkale-dest'),
+    faq: [{ question: 'Travertenlerde yürürken ne giymeliyim?', answer: 'Ayakkabılarınızı çıkarmanız gerekir, yanınıza yedek çorap almanız önerilir.' }],
+    status: 'published', seo_title: '', seo_description: '',
+  });
+  await createAttraction({
+    slug: 'hierapolis-antik-kenti',
+    title: 'Hierapolis Antik Kenti (Örnek İçerik)',
+    destination_id: pamukkaleDest.id,
+    summary: 'Traverten teraslarının hemen üzerinde kurulmuş, geniş bir nekropolü olan antik Roma-Bizans kenti.',
+    description: TR + 'Hierapolis, termal sularının şifa özellikleriyle antik çağda bir sağlık merkezi olarak ünlenmiştir. Antik tiyatro ve geniş nekropol alanı günümüzde de ziyaret edilebilir durumdadır.',
+    entrance_fee: '€25 (yaklaşık, Pamukkale traverten alanı dahil)', opening_hours: '08:00 - 19:00 (yaz), 08:00 - 17:00 (kış)', best_time: 'Gün doğumu veya gün batımı',
+    visitor_information: 'Traverten alanından yürüyerek ulaşılır, güneş kremi ve şapka önerilir.',
+    images: [{ url: img('hierapolis') }],
+    cover_image: img('hierapolis'), latitude: 37.9241, longitude: 29.1256, status: 'published', seo_title: '', seo_description: '',
+  });
+
+  const bodrum = await createDestination({
+    slug: 'bodrum',
+    title: 'Bodrum (Örnek İçerik)',
+    summary: 'Beyaz mimarisi, marinası ve St. Peter Kalesi ile Ege\'nin en popüler tatil beldelerinden biri.',
+    description: TR + 'Bodrum, hem tarihi dokusu hem de canlı gece hayatıyla bilinir. Bodrum Kalesi (St. Peter Kalesi) ve içindeki Sualtı Arkeoloji Müzesi ilçenin başlıca durağıdır.',
+    visitor_information: 'Milas-Bodrum Havalimanı\'na araçla yaklaşık 40 dakika mesafededir.',
+    images: [{ url: img('bodrum-dest') }],
+    cover_image: img('bodrum-dest'), faq: [], status: 'published', seo_title: '', seo_description: '',
+  });
+  await createAttraction({
+    slug: 'bodrum-kalesi',
+    title: 'Bodrum Kalesi (St. Peter Kalesi) (Örnek İçerik)',
+    destination_id: bodrum.id,
+    summary: 'Marina kıyısında yükselen, içinde Sualtı Arkeoloji Müzesi\'ni barındıran tarihi kale.',
+    description: TR + '15. yüzyılda St. John Şövalyeleri tarafından inşa edilen kale, günümüzde Sualtı Arkeoloji Müzesi\'ne ev sahipliği yapmaktadır.',
+    entrance_fee: '€15 (yaklaşık)', opening_hours: '09:00 - 19:00 (yaz), 08:30 - 17:30 (kış)', best_time: 'Öğleden sonra',
+    visitor_information: 'Marina kıyısında, şehir merkezinde yer alır.',
+    images: [{ url: img('bodrum-kalesi') }],
+    cover_image: img('bodrum-kalesi'), latitude: 37.0344, longitude: 27.4297, status: 'published', seo_title: '', seo_description: '',
+  });
+
+  const bergama = await createDestination({
+    slug: 'bergama',
+    title: 'Bergama (Pergamon) (Örnek İçerik)',
+    summary: 'Antik Pergamon Krallığı\'nın başkenti, tepedeki Akropol ve dünyanın ikinci büyük kütüphanesiyle ünlü.',
+    description: TR + 'Bergama, Helenistik dönemin en önemli merkezlerinden biriydi. Akropol\'deki dik eğimli antik tiyatro ve Asklepion sağlık merkezi kalıntıları başlıca görülmesi gereken yerlerdir.',
+    visitor_information: 'İzmir\'e araçla yaklaşık 1.5 saat mesafededir. Akropol\'e teleferikle çıkılabilir.',
+    images: [{ url: img('bergama-dest') }],
+    cover_image: img('bergama-dest'), faq: [], status: 'published', seo_title: '', seo_description: '',
+  });
+  await createAttraction({
+    slug: 'pergamon-akropolu',
+    title: 'Pergamon Akropolü (Örnek İçerik)',
+    destination_id: bergama.id,
+    summary: 'Tepede kurulu antik kent kalıntıları; dik eğimli tiyatrosu ve Zeus Sunağı temelleriyle bilinir.',
+    description: TR + 'Akropol, antik Bergama\'nın yönetim ve dini merkeziydi. Dünyanın en dik antik tiyatrolarından biri burada yer alır ve vadiye nefes kesen bir manzara sunar.',
+    entrance_fee: '€12 (yaklaşık, teleferik hariç)', opening_hours: '08:00 - 19:00 (yaz), 08:00 - 17:00 (kış)', best_time: 'Sabah (teleferik kuyrukları için)',
+    visitor_information: 'Teleferikle veya araçla tepeye çıkılabilir, rahat ayakkabı önerilir.',
+    images: [{ url: img('pergamon-akropolu') }],
+    cover_image: img('pergamon-akropolu'), latitude: 39.1313, longitude: 27.1841, status: 'published', seo_title: '', seo_description: '',
+  });
+
+  // --- Tours (2 per type = 6, all Featured on homepage) ---
+  await createTour({
+    title: 'Efes & Meryem Ana Evi Klasik Tur Paketi - 2 Gün (Örnek İçerik)',
+    type: 'package', departure_point: 'Selçuk', destination_id: selcuk.id, is_featured: true,
+    summary: 'Efes Antik Kenti, Meryem Ana Evi ve Şirince\'yi kapsayan, bir gece konaklamalı klasik paket tur.',
+    description: TR + 'İki gün boyunca bölgenin en önemli tarihi ve kültürel duraklarını rahat bir tempoda gezersiniz: Efes Antik Kenti, Meryem Ana Evi, Efes Müzesi ve Şirince köyü.',
+    price: 260, original_price: 0, price_note: 'Kişi başı, çift kişilik oda esaslı', currency: 'EUR',
+    duration_days: 2, location: 'Selçuk / Efes', start_date: '', capacity: 16, status: 'published',
+    languages: ['TR', 'EN'],
+    highlights: ['Efes Antik Kenti', 'Meryem Ana Evi', 'Efes Müzesi', 'Şirince Köyü'],
+    included: ['Profesyonel Rehber', 'Ulaşım (Araç)', 'Konaklama (1 gece)'],
+    excluded: ['Giriş Ücretleri (isteğe bağlı olarak eklenebilir)', 'Öğle Yemekleri (isteğe bağlı olarak eklenebilir)'],
+    images: [{ url: img('efes-meryemana-1') }, { url: img('efes-meryemana-2') }],
+    itinerary: [
+      { day_number: 1, title: 'Efes ve Meryem Ana Evi', details: 'Otelden alış, Efes Antik Kenti, Meryem Ana Evi ziyareti, otele yerleşme.' },
+      { day_number: 2, title: 'Efes Müzesi ve Şirince', details: 'Efes Müzesi ziyareti, Şirince köyünde serbest zaman, dönüş.' },
+    ],
+    route: [],
+    vehicle_tiers: [{ min_people: 1, max_people: 5, vehicle_name: 'Vito', cost: 120 }, { min_people: 6, max_people: 16, vehicle_name: 'Sprinter', cost: 180 }],
+    fixed_costs: [{ name: 'Rehber (2 Gün)', cost: 180 }],
+    optional_costs: [{ name: 'Efes Giriş', cost_per_person: 40, category: 'entrance' }, { name: 'Öğle Yemeği (günlük)', cost_per_person: 12, category: 'food' }],
+    seo_title: '', seo_description: '',
+  });
+
+  await createTour({
+    title: 'Bodrum Tekne Turu ve Marina Paketi - 2 Gün (Örnek İçerik)',
+    type: 'package', departure_point: 'Bodrum', destination_id: bodrum.id, is_featured: true,
+    summary: 'Bodrum Kalesi, marina gezisi ve koylarda yüzme molalı bir günlük tekne turunu kapsayan 2 günlük paket.',
+    description: TR + 'Bodrum\'un tarihi dokusunu ve Ege\'nin berrak koylarını bir arada deneyimleyin: kale ziyareti, marina yürüyüşü ve özel tekneyle koy turu.',
+    price: 310, original_price: 350, price_note: 'Kişi başı, çift kişilik oda esaslı', currency: 'EUR',
+    duration_days: 2, location: 'Bodrum', start_date: '', capacity: 12, status: 'published',
+    languages: ['TR', 'EN'],
+    highlights: ['Bodrum Kalesi', 'Marina', 'Tekne Turu', 'Koylarda Yüzme'],
+    included: ['Profesyonel Rehber', 'Tekne Turu', 'Konaklama (1 gece)'],
+    excluded: ['Kale Giriş Ücreti (isteğe bağlı olarak eklenebilir)', 'Öğle Yemekleri (isteğe bağlı olarak eklenebilir)'],
+    images: [{ url: img('bodrum-tekne-1') }, { url: img('bodrum-tekne-2') }],
+    itinerary: [
+      { day_number: 1, title: 'Bodrum Kalesi ve Marina', details: 'Otelden alış, Bodrum Kalesi ziyareti, marina çevresinde serbest zaman.' },
+      { day_number: 2, title: 'Tekne Turu', details: 'Koylarda yüzme molalı tam gün tekne turu, dönüş.' },
+    ],
+    route: [],
+    vehicle_tiers: [{ min_people: 1, max_people: 12, vehicle_name: 'Sprinter', cost: 200 }],
+    fixed_costs: [{ name: 'Tekne Kirası', cost: 400 }],
+    optional_costs: [{ name: 'Kale Girişi', cost_per_person: 15, category: 'entrance' }, { name: 'Öğle Yemeği (tekne)', cost_per_person: 18, category: 'food' }],
+    seo_title: '', seo_description: '',
+  });
+
+  await createTour({
+    title: 'Bergama Antik Kenti Günübirlik Turu (Örnek İçerik)',
+    type: 'daily', departure_point: 'İzmir', destination_id: bergama.id, is_featured: true,
+    summary: 'Pergamon Akropolü, Asklepion ve Kızıl Avlu\'yu kapsayan özel günübirlik tur.',
+    description: TR + 'Antik Pergamon Krallığı\'nın başkentini profesyonel rehberiniz eşliğinde keşfedin: tepedeki Akropol, antik sağlık merkezi Asklepion ve dev tuğla yapı Kızıl Avlu.',
+    price: 95, original_price: 0, price_note: '1 kişi için örnek fiyat', currency: 'EUR',
+    duration_days: 1, location: 'Bergama / İzmir', start_date: '', capacity: 16, status: 'published',
+    languages: ['TR', 'EN'],
+    highlights: ['Pergamon Akropolü', 'Asklepion', 'Kızıl Avlu'],
+    included: ['Profesyonel Rehber', 'Ulaşım (Araç)'],
+    excluded: ['Giriş Ücretleri (isteğe bağlı olarak eklenebilir)', 'Öğle Yemeği (isteğe bağlı olarak eklenebilir)'],
+    images: [{ url: img('bergama-gunubirlik') }],
+    itinerary: [{ day_number: 1, title: 'Bergama Turu', details: 'Otelden alış, Akropol, Asklepion, Kızıl Avlu ziyareti ve otele dönüş.' }],
+    route: [],
+    vehicle_tiers: [{ min_people: 1, max_people: 5, vehicle_name: 'Vito', cost: 90 }, { min_people: 6, max_people: 16, vehicle_name: 'Sprinter', cost: 140 }],
+    fixed_costs: [{ name: 'Rehber', cost: 100 }],
+    optional_costs: [{ name: 'Akropol Girişi', cost_per_person: 12, category: 'entrance' }, { name: 'Öğle Yemeği', cost_per_person: 10, category: 'food' }],
+    seo_title: '', seo_description: '',
+  });
+
+  await createTour({
+    title: 'Kuşadası Şehir Turu ve Yerel Pazar Gezisi (Örnek İçerik)',
+    type: 'daily', departure_point: 'Kuşadası', destination_id: kusadasi.id, is_featured: true,
+    summary: 'Güvercinada, marina ve yerel pazarı kapsayan yarım günlük şehir turu.',
+    description: TR + 'Kuşadası\'nın sahil şeridini ve yerel yaşamını yakından tanıyın: Güvercinada gezisi, marina yürüyüşü ve haftalık yerel pazarda alışveriş molası.',
+    price: 45, original_price: 0, price_note: '1 kişi için örnek fiyat', currency: 'EUR',
+    duration_days: 1, location: 'Kuşadası', start_date: '', capacity: 16, status: 'published',
+    languages: ['TR', 'EN'],
+    highlights: ['Güvercinada', 'Marina', 'Yerel Pazar'],
+    included: ['Rehber Eşliğinde Gezi'],
+    excluded: ['Alışveriş Harcamaları'],
+    images: [{ url: img('kusadasi-sehir') }], itinerary: [], route: [],
+    vehicle_tiers: [{ min_people: 1, max_people: 16, vehicle_name: 'Minibüs', cost: 70 }],
+    fixed_costs: [{ name: 'Rehber', cost: 60 }],
+    optional_costs: [],
+    seo_title: '', seo_description: '',
+  });
+
+  await createTour({
+    title: 'Kuşadası Güvercinada Yürüyüş Turu (Örnek İçerik)',
+    type: 'activity', departure_point: 'Kuşadası', destination_id: kusadasi.id, is_featured: true,
+    summary: 'Güvercinada çevresinde rehberli kısa yürüyüş ve gün batımı manzarası.',
+    description: TR + 'Kuşadası\'nın simgesi Güvercinada\'yı kısa bir yürüyüşle keşfedin, kale kalıntılarını görün ve gün batımını izleyin.',
+    price: 20, original_price: 0, price_note: 'Kişi başı', currency: 'EUR',
+    duration_days: 1, location: 'Kuşadası', start_date: '', capacity: 20, status: 'published',
+    languages: ['TR', 'EN'],
+    highlights: ['Güvercinada', 'Gün Batımı'],
+    included: ['Rehber Eşliğinde Gezi'],
+    excluded: ['Kale Giriş Ücreti (isteğe bağlı olarak eklenebilir)'],
+    images: [{ url: img('guvercinada-yuruyus') }], itinerary: [], route: [],
+    vehicle_tiers: [{ min_people: 1, max_people: 20, vehicle_name: 'Minibüs', cost: 50 }],
+    fixed_costs: [{ name: 'Rehber', cost: 40 }],
+    optional_costs: [{ name: 'Kale Girişi', cost_per_person: 5, category: 'entrance' }],
+    seo_title: '', seo_description: '',
+  });
+
+  await createTour({
+    title: 'Hierapolis ve Antik Havuz Ziyareti (Örnek İçerik)',
+    type: 'activity', departure_point: 'Pamukkale', destination_id: pamukkaleDest.id, is_featured: true,
+    summary: 'Hierapolis Antik Kenti ve isteğe bağlı Cleopatra Havuzu deneyimini kapsayan yarım günlük aktivite.',
+    description: TR + 'Traverten teraslarının hemen üzerindeki Hierapolis Antik Kenti\'ni gezin, isteğe bağlı olarak Cleopatra\'nın antik termal havuzunda yüzme deneyimi yaşayın.',
+    price: 30, original_price: 0, price_note: 'Kişi başı', currency: 'EUR',
+    duration_days: 1, location: 'Pamukkale', start_date: '', capacity: 20, status: 'published',
+    languages: ['TR', 'EN'],
+    highlights: ['Hierapolis Antik Kenti', 'Cleopatra Havuzu (isteğe bağlı)'],
+    included: ['Rehber Eşliğinde Gezi'],
+    excluded: ['Hierapolis Giriş Ücreti (isteğe bağlı olarak eklenebilir)', 'Cleopatra Havuzu Girişi (isteğe bağlı olarak eklenebilir)'],
+    images: [{ url: img('hierapolis-havuz') }], itinerary: [], route: [],
+    vehicle_tiers: [{ min_people: 1, max_people: 20, vehicle_name: 'Minibüs', cost: 80 }],
+    fixed_costs: [{ name: 'Rehber', cost: 60 }],
+    optional_costs: [{ name: 'Hierapolis Giriş', cost_per_person: 25, category: 'entrance' }, { name: 'Cleopatra Havuzu', cost_per_person: 12, category: 'entrance' }],
+    seo_title: '', seo_description: '',
+  });
+
+  // --- Transfer Routes (6, all Featured on homepage) ---
+  await createRoute({
+    title: 'Izmir Airport to Kuşadası Private Transfer Service (Örnek İçerik)',
+    pickup_location: 'Izmir Airport', dropoff_location: 'Kuşadası', duration_text: '1hr 15min', distance_km: 95,
+    is_featured: true, currency: 'EUR', status: 'published',
+    summary: 'A comfortable, direct private transfer between Adnan Menderes Airport and Kuşadası.',
+    description: EN + 'This route covers approximately 95 kilometers and typically takes around 1 hour 15 minutes, with an English-speaking driver and a meet & greet at arrivals.',
+    vehicle_tiers: [{ min_people: 1, max_people: 4, vehicle_name: 'Vito', cost: 85 }, { min_people: 5, max_people: 12, vehicle_name: 'Sprinter', cost: 130 }],
+    fixed_costs: [], optional_costs: [{ name: 'Child Seat', cost_per_person: 8, category: 'extra' }],
+    seo_title: '', seo_description: '',
+  });
+  await createRoute({
+    title: 'Izmir Airport to Selçuk Private Transfer Service (Örnek İçerik)',
+    pickup_location: 'Izmir Airport', dropoff_location: 'Selçuk', duration_text: '55min', distance_km: 65,
+    is_featured: true, currency: 'EUR', status: 'published',
+    summary: 'Direct private transfer between Adnan Menderes Airport and Selçuk, the gateway to Ephesus.',
+    description: EN + 'A short, comfortable ride of around 55 minutes — ideal for guests heading straight to their Ephesus-area hotel.',
+    vehicle_tiers: [{ min_people: 1, max_people: 4, vehicle_name: 'Vito', cost: 70 }, { min_people: 5, max_people: 12, vehicle_name: 'Sprinter', cost: 110 }],
+    fixed_costs: [], optional_costs: [{ name: 'Child Seat', cost_per_person: 8, category: 'extra' }],
+    seo_title: '', seo_description: '',
+  });
+  await createRoute({
+    title: 'Izmir Cruise Port to Kuşadası Private Transfer Service (Örnek İçerik)',
+    pickup_location: 'Izmir Cruise Port', dropoff_location: 'Kuşadası', duration_text: '1hr 10min', distance_km: 90,
+    is_featured: true, currency: 'EUR', status: 'published',
+    summary: 'A relaxed transfer from Izmir Cruise Port straight to your Kuşadası hotel.',
+    description: EN + 'Popular with cruise passengers extending their stay — around 90 kilometers, typically 1 hour 10 minutes depending on port traffic.',
+    vehicle_tiers: [{ min_people: 1, max_people: 4, vehicle_name: 'Vito', cost: 80 }, { min_people: 5, max_people: 12, vehicle_name: 'Sprinter', cost: 125 }],
+    fixed_costs: [], optional_costs: [],
+    seo_title: '', seo_description: '',
+  });
+  await createRoute({
+    title: 'Pamukkale to Izmir Airport Private Transfer Service (Örnek İçerik)',
+    pickup_location: 'Pamukkale', dropoff_location: 'Izmir Airport', duration_text: '3hr', distance_km: 250,
+    is_featured: true, currency: 'EUR', status: 'published',
+    summary: 'A long-distance private transfer from Pamukkale directly to Adnan Menderes Airport.',
+    description: EN + 'Covers approximately 250 kilometers in about 3 hours — a comfortable option for guests flying out after visiting the travertines.',
+    vehicle_tiers: [{ min_people: 1, max_people: 4, vehicle_name: 'Vito', cost: 190 }, { min_people: 5, max_people: 12, vehicle_name: 'Sprinter', cost: 260 }],
+    fixed_costs: [], optional_costs: [{ name: 'Child Seat', cost_per_person: 8, category: 'extra' }],
+    seo_title: '', seo_description: '',
+  });
+  await createRoute({
+    title: 'Bodrum Airport to Bodrum Private Transfer Service (Örnek İçerik)',
+    pickup_location: 'Bodrum Airport', dropoff_location: 'Bodrum', duration_text: '40min', distance_km: 35,
+    is_featured: true, currency: 'EUR', status: 'published',
+    summary: 'A short, comfortable transfer between Milas-Bodrum Airport and Bodrum town center.',
+    description: EN + 'A quick 35-kilometer ride of around 40 minutes — the same premium comfort standard on the return leg.',
+    vehicle_tiers: [{ min_people: 1, max_people: 4, vehicle_name: 'Vito', cost: 55 }, { min_people: 5, max_people: 12, vehicle_name: 'Sprinter', cost: 85 }],
+    fixed_costs: [], optional_costs: [],
+    seo_title: '', seo_description: '',
+  });
+  await createRoute({
+    title: 'Kuşadası to Pamukkale Private Transfer Service (Örnek İçerik)',
+    pickup_location: 'Kuşadası', dropoff_location: 'Pamukkale', duration_text: '2hr 45min', distance_km: 190,
+    is_featured: true, currency: 'EUR', status: 'published',
+    summary: 'A comfortable inter-city private transfer from Kuşadası to Pamukkale.',
+    description: EN + 'Covers approximately 190 kilometers in about 2 hours 45 minutes — a popular route for guests combining Ephesus and the travertines in one trip.',
+    vehicle_tiers: [{ min_people: 1, max_people: 4, vehicle_name: 'Vito', cost: 140 }, { min_people: 5, max_people: 12, vehicle_name: 'Sprinter', cost: 200 }],
+    fixed_costs: [], optional_costs: [{ name: 'Child Seat', cost_per_person: 8, category: 'extra' }],
+    seo_title: '', seo_description: '',
+  });
+
+  // --- Blog posts (6) ---
+  const samplePosts = [
+    {
+      title: 'Efes Antik Kenti\'ni Ziyaret Etmeden Önce Bilmeniz Gereken 7 Şey (Örnek İçerik)',
+      excerpt: 'Efes gezinizi planlarken zamandan tasarruf etmenizi sağlayacak pratik ipuçları.',
+      content: TR + 'Efes Antik Kenti\'ni ziyaret etmeden önce giriş kapılarını, en uygun saatleri ve rahat bir gezi için nelere dikkat etmeniz gerektiğini öğrenin. Sabah erken saatler hem sıcaktan korunmak hem de kalabalıktan kaçınmak için idealdir. Rahat yürüyüş ayakkabısı, şapka ve su şişesi yanınızda olsun.',
+      author: 'TurRota Ekibi',
+      cover_image: img('blog-efes'),
+    },
+    {
+      title: 'Pamukkale\'de Bir Gün: Rota Önerisi (Örnek İçerik)',
+      excerpt: 'Travertenler, Hierapolis ve Cleopatra Havuzu\'nu tek günde nasıl gezersiniz?',
+      content: TR + 'Pamukkale\'yi tek günde gezmek için önerilen rota: sabah erken traverten yürüyüşü, ardından Hierapolis Antik Kenti ve öğleden sonra isteğe bağlı Cleopatra Havuzu. Traverten alanında ayakkabılarınızı çıkarmanız gerektiğini unutmayın.',
+      author: 'TurRota Ekibi',
+      cover_image: img('blog-pamukkale'),
+    },
+    {
+      title: 'Kuşadası\'nda Yapılacak En İyi 5 Aktivite (Örnek İçerik)',
+      excerpt: 'Sahilden pazar gezisine, Kuşadası\'nda vaktinizi değerlendirmenin en iyi yolları.',
+      content: TR + 'Güvercinada\'da gün batımı izlemekten yerel pazarda alışveriş yapmaya, Kuşadası\'nda kısa bir molada bile keyifli vakit geçirebileceğiniz beş öneri derledik.',
+      author: 'TurRota Ekibi',
+      cover_image: img('blog-kusadasi'),
+    },
+    {
+      title: 'Bodrum\'da Tekne Turu Rehberi: Bilmeniz Gerekenler (Örnek İçerik)',
+      excerpt: 'İlk kez tekne turuna çıkacaklar için pratik bilgiler ve öneriler.',
+      content: TR + 'Bodrum koylarında bir tekne turuna çıkmadan önce ne giymeniz gerektiğini, hangi koyların en popüler olduğunu ve tekne turunun genel akışını anlatıyoruz.',
+      author: 'TurRota Ekibi',
+      cover_image: img('blog-bodrum'),
+    },
+    {
+      title: 'Bergama (Pergamon) Akropolü\'ne Nasıl Gidilir? (Örnek İçerik)',
+      excerpt: 'Teleferikle mi yoksa araçla mı? Bergama Akropolü\'ne ulaşım seçenekleri.',
+      content: TR + 'Bergama Akropolü\'ne teleferikle çıkmak hem manzara hem de kolaylık açısından en popüler seçenektir. Araçla ulaşım da mümkündür; ziyaret süresini ve giriş saatlerini bu yazıda bulabilirsiniz.',
+      author: 'TurRota Ekibi',
+      cover_image: img('blog-bergama'),
+    },
+    {
+      title: 'Ege Bölgesinde Gezerken Paketinize Neler Almalısınız? (Örnek İçerik)',
+      excerpt: 'Efes, Pamukkale ve Bodrum turlarında işinize yarayacak pratik bir paketleme listesi.',
+      content: TR + 'Rahat ayakkabı, şapka, güneş kremi ve su şişesi Ege bölgesi turlarının olmazsa olmazlarındandır. Mevsime göre değişen önerilerimizi bu yazıda bulabilirsiniz.',
+      author: 'TurRota Ekibi',
+      cover_image: img('blog-packing-list'),
+    },
+  ];
+  for (const p of samplePosts) {
+    const rawSlug = slugify(p.title, { lower: true, strict: true });
+    let slug = rawSlug;
+    for (let i = 2; await blogPosts.slugExists(slug); i++) slug = `${rawSlug}-${i}`;
+    await blogPosts.create({ ...p, slug, status: 'published', seo_title: '', seo_description: '' });
+  }
+
+  await pool.query('UPDATE settings SET sample_extra_content_seeded = 1 WHERE id = 1');
+  console.log(
+    '[db] Seeded extra demo content (5 more destinations + 8 attractions, 6 tours, 6 transfer routes, 6 blog posts). Delete anything from the relevant Admin screen whenever you like — it will not be recreated.'
+  );
+}
+
 async function init() {
   await pool.query('SELECT 1'); // fail fast with a clear error if DB_* is wrong
   await createSchema();
@@ -2687,6 +3119,7 @@ async function init() {
   await seedSampleTransferIfNeeded();
   await seedSampleSmallGroupTourIfNeeded();
   await seedSampleDestinationsIfNeeded();
+  await seedSampleExtraContentIfNeeded();
 }
 
 module.exports = {

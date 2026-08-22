@@ -519,14 +519,27 @@ On first startup against a database with no tours yet, the server automatically 
 sample Transfer Routes, and 1 sample Destination with 2 sample Attractions (all also
 "(Örnek İçerik)", including a few sample availability dates on the Transfer routes), so you
 have something real to click through and review right after deploying, with zero setup.
+
+A second, much larger batch — added later, requested so every section of the site could be
+reviewed at full/realistic density instead of 1-2 items per section — seeds 5 more
+Destinations (Kuşadası, Selçuk, Pamukkale, Bodrum, Bergama — 6 total) with 8 more
+Attractions, 6 more Tours (2 Package/2 Daily/2 Activity, all marked **Featured on
+homepage** and several linked to a Destination so "Things To Do" has something to show),
+6 more Transfer Routes (all marked Featured), and — new, there was no Blog seed before this
+— 6 Blog posts. Every one of these carries a placeholder photo from picsum.photos (same
+approach as `server/scripts/seed.js` below — fetched by each visitor's own browser, so it
+works regardless of the server's own network access) instead of the empty "No image" boxes
+the first, smaller batch leaves.
+
 This only ever happens once per content type: each batch is guarded by its own permanent
 flag (`sample_content_seeded`, `sample_small_group_seeded`, `sample_transfer_seeded`,
-`sample_destinations_seeded`), not by whether the sample items still exist, so once you
-delete them from Admin > Tours / Admin > Transfers / Admin > Destinations & Attractions
-(once you start entering your real content), they will not come back — not even after a
-future update. This per-batch flagging is also why a future update can safely add a new
-sample batch without re-seeding content you've already deleted: an update that adds sample
-content always gets its own new flag, never reuses one from a previous batch.
+`sample_destinations_seeded`, `sample_extra_content_seeded`), not by whether the sample
+items still exist, so once you delete them from Admin > Tours / Transfers / Destinations &
+Attractions / Blog (once you start entering your real content), they will not come back —
+not even after a future update. This per-batch flagging is also why a future update can
+safely add a new sample batch without re-seeding content you've already deleted: an update
+that adds sample content always gets its own new flag, never reuses one from a previous
+batch.
 
 The Agency Portal is the one exception — no sample agency account is auto-created, since an
 agency login carries real credentials and the site owner registers each one by hand from
