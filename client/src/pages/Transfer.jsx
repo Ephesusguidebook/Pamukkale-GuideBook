@@ -116,13 +116,13 @@ export default function Transfer() {
 
   return (
     <div>
-      <div className="bg-gradient-to-br from-blue-800 to-blue-600 px-4 py-16 text-center text-white sm:px-6">
-        <span className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide">
+      <section className="bg-gray-50 px-4 py-16 text-center sm:px-6">
+        <span className="inline-flex items-center gap-2 rounded-full border border-teal-200 bg-white px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-teal-700">
           Private Airport Transfers
         </span>
-        <h1 className="mt-4 font-serif text-4xl font-bold sm:text-5xl">Book Your Transfer</h1>
-        <p className="mt-3 text-blue-100">Safe, comfortable, and on-time — door to door service</p>
-      </div>
+        <h1 className="mt-4 font-serif text-4xl font-bold text-gray-900 sm:text-5xl">Book Your Transfer</h1>
+        <p className="mt-3 text-gray-500">Safe, comfortable, and on-time — door to door service</p>
+      </section>
 
       <div className="mx-auto max-w-5xl px-4 sm:px-6">
         <div className="card -mt-10 relative z-10 space-y-4 p-6">
@@ -149,7 +149,7 @@ export default function Transfer() {
             <button
               type="button"
               onClick={swap}
-              className="mb-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-blue-200 text-blue-700 hover:bg-blue-50"
+              className="mb-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-teal-200 text-teal-700 hover:bg-teal-50"
               aria-label="Swap"
             >
               ↔
@@ -180,7 +180,7 @@ export default function Transfer() {
             <div className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{searchNotice}</div>
           )}
           {filterLabel && (
-            <div className="flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-800">
+            <div className="flex items-center justify-between rounded-lg bg-teal-50 px-3 py-2 text-sm text-teal-800">
               <span>{filterLabel}</span>
               <button
                 type="button"
@@ -197,9 +197,29 @@ export default function Transfer() {
         </div>
 
         <div className="py-10">
-          <h2 className="text-xl font-bold text-gray-900">
-            All Transfer Routes <span className="text-base font-normal text-gray-400">({filtered.length} routes available)</span>
-          </h2>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <h2 className="text-xl font-bold text-gray-900">
+              All Transfer Routes <span className="text-base font-normal text-gray-400">({filtered.length} routes available)</span>
+            </h2>
+            <div className="w-full sm:w-56">
+              <label className="label">Starts in</label>
+              <select
+                className="input"
+                value={pickup}
+                onChange={(e) => {
+                  setPickup(e.target.value);
+                  setSearchNotice('');
+                }}
+              >
+                <option value="">All starting points</option>
+                {locations.map((l) => (
+                  <option key={l} value={l}>
+                    {l}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
 
           {loading && <p className="mt-6 text-gray-500">Loading...</p>}
           {!loading && filtered.length === 0 && <p className="mt-6 text-gray-500">No transfer routes match this search yet.</p>}
@@ -211,7 +231,7 @@ export default function Transfer() {
                 <Link
                   key={r.id}
                   to={`/transfer/${r.slug}`}
-                  className="card flex items-center justify-between gap-4 border-l-4 border-l-blue-700 p-4 transition hover:-translate-y-0.5 hover:shadow-md"
+                  className="card flex items-center justify-between gap-4 border-l-4 border-l-teal-700 p-4 transition hover:-translate-y-0.5 hover:shadow-md"
                 >
                   <div>
                     <p className="font-semibold text-gray-900">
@@ -223,7 +243,7 @@ export default function Transfer() {
                   </div>
                   <div className="flex-shrink-0 text-right">
                     <p className="text-xs uppercase text-gray-400">Starting from</p>
-                    <p className="text-lg font-bold text-blue-700">{formatPrice(quote.total, r.currency)}</p>
+                    <p className="text-lg font-bold text-teal-700">{formatPrice(quote.total, r.currency)}</p>
                   </div>
                 </Link>
               );

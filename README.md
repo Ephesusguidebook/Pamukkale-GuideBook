@@ -373,8 +373,12 @@ airport pickups), alongside Tours:
 - **Availability**: each route has its own calendar (Available / On Request / Closed per
   date, defaulting to Available so you only need to touch dates you want to restrict) —
   click a date in the admin editor to cycle its status.
-- **Public `/transfer` page**: a route search (pick-up + drop-off, with a swap button)
-  filters the list of published routes.
+- **Public `/transfer` page**: a plain (no colored hero band) title + intro + route search
+  (pick-up + drop-off, with a swap button) that both filters the list below live and, when
+  both ends are picked, jumps straight to that route's detail page via **Search**. A second,
+  simpler **"Starts in"** dropdown sits right above the route list itself — same pick-up
+  filter, kept in sync with the search card above it, for quickly narrowing a long list of
+  routes without needing to also pick a drop-off.
 - **Public `/transfer/:slug` page**: a booking widget — One Way / Round Trip, the
   availability calendar (closed dates aren't selectable), transfer time, passenger count
   (automatically recommends a vehicle tier as it changes, e.g. switching from a Vito to a
